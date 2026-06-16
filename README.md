@@ -4,6 +4,10 @@ A lightweight, native macOS menu-bar app for Samsung Galaxy Buds. Connect over
 Bluetooth and control noise cancellation, ambient sound, the equalizer, touch
 gestures, find-my-earbuds, and more — without leaving your menu bar.
 
+<p align="center">
+  <img src="docs/screenshots/demo.gif" width="520" alt="Galaxy Buds for Mac demo">
+</p>
+
 > Unofficial. Not affiliated with or endorsed by Samsung. "Galaxy Buds" is a
 > trademark of Samsung Electronics.
 
