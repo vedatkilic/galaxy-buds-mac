@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galaxy Buds for Mac — native menu-bar controller</title>
+<meta name="description" content="A free, open-source native macOS menu-bar app to control Samsung Galaxy Buds: battery, ANC, equalizer, touch controls and more.">
+<style>
+  :root { --accent:#0F8C6B; --ink:#1b1d23; --muted:#5b6066; --line:#e6e8eb; --bg:#ffffff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:var(--ink); background:var(--bg); }
+  .wrap { max-width:760px; margin:0 auto; padding:0 20px; }
+  header { text-align:center; padding:56px 20px 32px; }
+  header img { width:104px; height:104px; border-radius:23%; }
+  h1 { font-size:30px; margin:18px 0 6px; }
+  .tag { color:var(--muted); font-size:18px; margin:0 0 22px; }
+  .btns a { display:inline-block; margin:6px; padding:11px 20px; border-radius:10px; text-decoration:none; font-weight:600; }
+  .primary { background:var(--accent); color:#fff; }
+  .ghost { border:1px solid var(--line); color:var(--ink); }
+  .shot { display:block; max-width:100%; border:1px solid var(--line); border-radius:14px; margin:28px auto; }
+  h2 { font-size:21px; margin:40px 0 12px; }
+  ul { padding-left:20px; }
+  li { margin:6px 0; }
+  pre { background:#f6f7f9; border:1px solid var(--line); border-radius:10px; padding:14px; overflow:auto; font-size:14px; }
+  .note { color:var(--muted); font-size:14px; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin:14px 0; }
+  footer { border-top:1px solid var(--line); margin-top:56px; padding:28px 20px 48px; text-align:center; color:var(--muted); font-size:14px; }
+  footer a { color:var(--muted); }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <img src="icon.png" alt="Galaxy Buds for Mac icon">
+  <h1>Galaxy Buds for Mac</h1>
+  <p class="tag">Control your Samsung Galaxy Buds from the macOS menu bar.</p>
+  <div class="btns">
+    <a class="primary" href="https://github.com/vedatkilic/galaxy-buds-mac/releases/latest">Download</a>
+    <a class="ghost" href="https://github.com/vedatkilic/galaxy-buds-mac">View on GitHub</a>
+  </div>
+</header>
+
+<div class="wrap">
+  <img class="shot" src="screenshots/demo.gif" alt="Demo">
+
+  <h2>Features</h2>
+  <ul>
+    <li>Per-earbud and case battery, right in the menu bar</li>
+    <li>Noise control: Off / Ambient / Adaptive / ANC, plus ANC strength</li>
+    <li>Equalizer and ambient sound customization (per-side level + tone)</li>
+    <li>Touch-and-hold actions, touchpad lock</li>
+    <li>Find My Earbuds and an earbud fit test</li>
+    <li>Auto-connect, launch at login, and 11 languages</li>
+  </ul>
+  <p class="note">Native SwiftUI, no dependencies. Supports Galaxy Buds through Buds4 Pro.</p>
+
+  <h2>Install</h2>
+  <p><strong>Homebrew</strong></p>
+  <pre>brew tap vedatkilic/tap
+brew trust vedatkilic/tap
+brew install --cask vedatkilic/tap/galaxy-buds</pre>
+  <p><strong>Or</strong> download the <code>.dmg</code> from
+  <a href="https://github.com/vedatkilic/galaxy-buds-mac/releases/latest">Releases</a>
+  and drag the app into Applications.</p>
+  <p class="note">The app is open-source and unsigned, so on first launch
+  right-click it → <strong>Open</strong>, or allow it under
+  System&nbsp;Settings → Privacy &amp; Security → <strong>Open Anyway</strong>.</p>
+
+  <h2>Privacy</h2>
+  <div class="card">
+    <p>No analytics, no tracking, no telemetry, no network calls. The app talks
+    only to your earbuds over Bluetooth, and everything stays on your Mac.
+    The only permission requested is Bluetooth.</p>
+    <p class="note">See the full <a href="privacy.html">Privacy Policy</a> and
+    <a href="terms.html">Terms of Service</a>.</p>
+  </div>
+
+  <h2>Developer</h2>
+  <div class="card">
+    <p>Built and maintained by <strong>Vedat Kılıç</strong> · Nivorbit.</p>
+    <p>Contact: <a href="mailto:vedat@nivorbit.com">vedat@nivorbit.com</a></p>
+  </div>
+</div>
+
+<footer>
+  Free &amp; open-source (<a href="https://github.com/vedatkilic/galaxy-buds-mac/blob/main/LICENSE">MIT</a>) ·
+  <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> ·
+  <a href="https://github.com/vedatkilic/galaxy-buds-mac">GitHub</a><br><br>
+  Unofficial. Not affiliated with or endorsed by Samsung.
+  “Galaxy Buds” is a trademark of Samsung Electronics.
+</footer>
+</body>
+</html>
