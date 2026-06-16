@@ -85,6 +85,15 @@ The app speaks the Galaxy Buds SPP/RFCOMM control protocol directly over
 `IOBluetooth`. All UI is SwiftUI; the menu-bar item and windows are AppKit. No
 third-party dependencies.
 
+## Privacy & transparency
+
+- **Fully open-source** (MIT) — the entire codebase is in this repository.
+- **No analytics, no tracking, no telemetry, no network calls.** The app only
+  communicates with your earbuds over Bluetooth.
+- **One permission:** Bluetooth, required to talk to the buds. Nothing else.
+- **No account, no ads, no paid tiers** — it's free.
+- Built by an independent developer; not affiliated with Samsung.
+
 ## License
 
 [MIT](LICENSE)
