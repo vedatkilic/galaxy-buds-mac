@@ -1,0 +1,16 @@
+# Build output
+BudsApp.app/
+.build/
+dist/
+*.dmg
+
+# macOS
+.DS_Store
+
+# Editor
+.swiftpm/
+*.xcuserstate
+xcuserdata/
+
+# Temp
+*.iconset/
