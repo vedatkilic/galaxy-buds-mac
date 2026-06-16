@@ -7,6 +7,14 @@ gestures, find-my-earbuds, and more — without leaving your menu bar.
 > Unofficial. Not affiliated with or endorsed by Samsung. "Galaxy Buds" is a
 > trademark of Samsung Electronics.
 
+## Screenshots
+
+| Menu bar quick panel | Settings |
+|:---:|:---:|
+| <img src="docs/screenshots/menu.png" width="360"> | <img src="docs/screenshots/dashboard.png" width="360"> |
+| **Sound & ANC** | **Earbud controls** |
+| <img src="docs/screenshots/sound-anc.png" width="360"> | <img src="docs/screenshots/earbud-controls.png" width="360"> |
+
 ## Features
 
 - **Menu-bar quick panel** — battery for each earbud, listen mode (Off /
@@ -27,6 +35,8 @@ Supports Galaxy Buds through Buds4 Pro.
 ### Homebrew
 
 ```bash
+brew tap vedatkilic/tap
+brew trust vedatkilic/tap   # Homebrew requires trusting third-party taps once
 brew install --cask vedatkilic/tap/galaxy-buds
 ```
 
