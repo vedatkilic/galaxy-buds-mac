@@ -31,7 +31,8 @@ struct MenuPopoverView: View {
                     .font(.system(size: 22, weight: .medium))
                     .foregroundStyle(tint)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
+                    Text(verbatim: bluetooth.connectedName
+                         ?? bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
                         .font(.system(size: 15, weight: .semibold))
                     HStack(spacing: 5) {
                         Circle().fill(.green).frame(width: 6, height: 6)

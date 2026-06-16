@@ -10,6 +10,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     var isScanning = false
     var discoveredDevices: [DiscoveredDevice] = []
     var connectedModel: BudsModel?
+    /// The user's custom Bluetooth name for the device (e.g. "Vedat's Buds4 Pro").
+    var connectedName: String?
     var status = BudsStatus()
     var connectionError: String?
     var bluetoothReady = false
@@ -149,6 +151,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     func connect(to device: DiscoveredDevice, model: BudsModel) {
         connectionError = nil
         connectedModel = model
+        connectedName = device.name
         connectedDevice = device.device
         startConnectTimeout()
 
@@ -220,6 +223,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         connectedDevice = nil
         isConnected = false
         connectedModel = nil
+        connectedName = nil
         // Hold off auto-reconnect briefly after a manual disconnect, then allow
         // it again (e.g. the user takes the buds out and puts them back).
         suppressAutoConnect = true

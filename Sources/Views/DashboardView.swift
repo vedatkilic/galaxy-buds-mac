@@ -45,8 +45,16 @@ struct DashboardView: View {
                 .font(.system(size: 54, weight: .medium))
                 .foregroundStyle(tint)
 
-            Text(bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
-                .font(.system(size: 17, weight: .semibold))
+            VStack(spacing: 2) {
+                Text(verbatim: bluetooth.connectedName
+                     ?? bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
+                    .font(.system(size: 17, weight: .semibold))
+                if bluetooth.connectedName != nil {
+                    Text(verbatim: bluetooth.connectedModel?.rawValue ?? "")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
 
             HStack(spacing: 30) {
                 CircularBatteryGauge(level: status.batteryLeft, label: "Left", diameter: 76)
