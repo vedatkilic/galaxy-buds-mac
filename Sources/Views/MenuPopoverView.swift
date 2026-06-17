@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The compact popover shown from the menu-bar icon — an AirPods-in-Control-
@@ -16,6 +17,7 @@ struct MenuPopoverView: View {
             } else {
                 disconnected
             }
+            footer
         }
         .padding(18)
         .frame(width: 300)
@@ -128,6 +130,24 @@ struct MenuPopoverView: View {
                 .foregroundStyle(.primary)
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        }
+    }
+
+    private var footer: some View {
+        VStack(spacing: 10) {
+            Divider()
+            Button(role: .destructive) {
+                NSApplication.shared.terminate(nil)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "power")
+                    Text("Quit")
+                }
+                .font(.system(size: 12))
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.secondary)
         }
     }
 

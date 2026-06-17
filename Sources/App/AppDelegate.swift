@@ -7,6 +7,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let bluetooth = BluetoothManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // An accessory app has no menu bar of its own, so install a minimal main
+        // menu purely to wire up the standard ⌘Q quit key equivalent.
+        setupMainMenu()
         let controller = StatusBarController(bluetooth: bluetooth)
         statusBarController = controller
         // Pop the panel up when the buds connect while we're running — an
@@ -25,6 +28,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         statusBarController?.showPanel()
         return true
+    }
+
+    private func setupMainMenu() {
+        let mainMenu = NSMenu()
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+
+        let appMenu = NSMenu()
+        appMenu.addItem(
+            withTitle: String(localized: "Quit Galaxy Buds"),
+            action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        )
+        appMenuItem.submenu = appMenu
+        NSApp.mainMenu = mainMenu
     }
 
     private func startObservingStatus() {
