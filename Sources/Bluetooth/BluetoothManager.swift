@@ -238,7 +238,9 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// don't fire dependably on all macOS versions.
     func pollAutoConnect() {
         guard autoConnectArmed, bluetoothReady, !isConnected,
-              rfcommChannel == nil, !suppressAutoConnect else { return }
+              rfcommChannel == nil, !suppressAutoConnect else {
+            return
+        }
         // IOBluetooth `isConnected()` is unreliable for these buds (returns false
         // even while connected), so we can't gate on it. Instead, attempt the
         // connection on a cooldown — it succeeds when the buds are reachable and
