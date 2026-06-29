@@ -3,6 +3,8 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private static let showPanelNotification = Notification.Name("com.nivorbit.budsapp.showPanel")
+
     private var statusBarController: StatusBarController?
     private let bluetooth = BluetoothManager()
 
@@ -15,9 +17,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .runningApplications(withBundleIdentifier: me.bundleIdentifier ?? "")
             .filter { $0 != me }
         if let existing = others.first {
+            // Tell the already-running copy to surface its panel, then quit.
             existing.activate(options: [])
+            DistributedNotificationCenter.default().postNotificationName(
+                Self.showPanelNotification, object: nil, deliverImmediately: true)
             NSApp.terminate(nil)
             return
+        }
+        // Let a re-launch (which hands off here and quits) re-open our panel.
+        DistributedNotificationCenter.default().addObserver(
+            forName: Self.showPanelNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.statusBarController?.showPanel() }
         }
         // An accessory app has no menu bar of its own, so install a minimal main
         // menu purely to wire up the standard ⌘Q quit key equivalent.

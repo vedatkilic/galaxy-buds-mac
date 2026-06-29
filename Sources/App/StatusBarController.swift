@@ -20,10 +20,19 @@ final class StatusBarController {
 
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem?.behavior = .removalAllowed
+        statusItem?.autosaveName = "GalaxyBudsStatusItem"
         if let button = statusItem?.button {
             applyIcon(to: button)
             button.action = #selector(togglePanel)
             button.target = self
+        }
+        // On notched Macs the item is sometimes parked at the default far-right
+        // slot (under the Control Center cluster) instead of being given a real
+        // position. Toggling visibility on the next runloop forces a re-layout.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.statusItem?.isVisible = false
+            self?.statusItem?.isVisible = true
         }
     }
 
@@ -79,22 +88,28 @@ final class StatusBarController {
         }
     }
 
-    /// Drops the panel straight down from the status item, flush under the menu
-    /// bar and horizontally centred on the icon (clamped to the screen).
+    /// Positions the panel just under the menu-bar icon, but always clamped to be
+    /// fully on-screen — so it's reachable even when the icon is hidden behind
+    /// the notch or off the edge of a full menu bar.
     private func positionPanel(_ panel: NSPanel) {
-        guard let button = statusItem?.button, let buttonWindow = button.window else { return }
         panel.layoutIfNeeded()
         let size = panel.contentView?.fittingSize ?? NSSize(width: 300, height: 360)
         panel.setContentSize(size)
 
-        let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-        let screen = buttonWindow.screen ?? NSScreen.main
-        var x = buttonRect.midX - size.width / 2
-        if let frame = screen?.visibleFrame {
-            x = min(max(frame.minX + 8, x), frame.maxX - size.width - 8)
+        let screen = statusItem?.button?.window?.screen ?? NSScreen.main
+        let frame = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+
+        var origin: NSPoint
+        if let button = statusItem?.button, let buttonWindow = button.window {
+            let r = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+            origin = NSPoint(x: r.midX - size.width / 2, y: r.minY - size.height - 4)
+        } else {
+            // No visible status button — fall back to top-centre of the screen.
+            origin = NSPoint(x: frame.midX - size.width / 2, y: frame.maxY - size.height - 8)
         }
-        let y = buttonRect.minY - size.height - 4
-        panel.setFrameOrigin(NSPoint(x: x, y: y))
+        origin.x = min(max(frame.minX + 8, origin.x), frame.maxX - size.width - 8)
+        origin.y = min(max(frame.minY + 8, origin.y), frame.maxY - size.height - 8)
+        panel.setFrameOrigin(origin)
     }
 
     private func closePanel() {
@@ -143,7 +158,15 @@ final class StatusBarController {
 
     func updateIcon(connected: Bool, batteryLeft: Int, batteryRight: Int) {
         guard let button = statusItem?.button else { return }
-        button.title = connected ? " \(min(batteryLeft, batteryRight))%" : ""
+        let battery = connected ? "\(min(batteryLeft, batteryRight))%" : ""
+        if button.image != nil {
+            // The SF Symbol is always visible; show battery beside it when connected.
+            button.title = battery.isEmpty ? "" : " \(battery)"
+        } else {
+            // No symbol available on this OS — keep a text label at all times so the
+            // variable-length item never collapses to zero width and vanishes.
+            button.title = battery.isEmpty ? "Buds" : "Buds \(battery)"
+        }
     }
 
     deinit {

@@ -32,6 +32,10 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
     private var rfcommChannel: IOBluetoothRFCOMMChannel?
     private var receiveBuffer = Data()
+    /// True from the moment a connection attempt starts until it succeeds or
+    /// fails. Guards against overlapping attempts (auto-connect racing the
+    /// wizard) that would otherwise reset the timeout and clobber `silentConnect`.
+    private var isConnecting = false
     private var connectedDevice: IOBluetoothDevice?
     private var inquiry: IOBluetoothDeviceInquiry?
     private var centralManager: CBCentralManager?
@@ -90,12 +94,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
     /// Connects to the first already-connected, paired Galaxy Buds, if any.
     private func attemptAutoConnect(notify: Bool) {
-        guard bluetoothReady, !isConnected, rfcommChannel == nil else { return }
+        guard bluetoothReady, !isConnected, rfcommChannel == nil, !isConnecting else { return }
         guard let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else { return }
         for device in paired where device.isConnected() && isGalaxyBudsName(device.name ?? "") {
             autoConnectShouldNotify = notify
             let model = BudsModel.detect(from: device.name ?? "") ?? .buds4Pro
-            connect(to: DiscoveredDevice(device: device), model: model)
+            connect(to: DiscoveredDevice(device: device), model: model, silent: true)
             return
         }
     }
@@ -148,7 +152,18 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         isScanning = false
     }
 
-    func connect(to device: DiscoveredDevice, model: BudsModel) {
+    func connect(to device: DiscoveredDevice, model: BudsModel, silent: Bool = false) {
+        // Single in-flight attempt: a second connect (e.g. auto-connect racing
+        // the wizard) must not reset the timeout or flip `silentConnect`, which
+        // previously left the wizard stuck on "Connecting" forever. A foreground
+        // (non-silent) request arriving mid-flight just promotes the in-flight
+        // attempt to surface its result instead of failing quietly.
+        if isConnecting {
+            if !silent { silentConnect = false }
+            return
+        }
+        isConnecting = true
+        silentConnect = silent
         connectionError = nil
         connectedModel = model
         connectedName = device.name
@@ -224,6 +239,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         isConnected = false
         connectedModel = nil
         connectedName = nil
+        isConnecting = false
+        cancelConnectTimeout()
         // Hold off auto-reconnect briefly after a manual disconnect, then allow
         // it again (e.g. the user takes the buds out and puts them back).
         suppressAutoConnect = true
@@ -238,7 +255,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// don't fire dependably on all macOS versions.
     func pollAutoConnect() {
         guard autoConnectArmed, bluetoothReady, !isConnected,
-              rfcommChannel == nil, !suppressAutoConnect else {
+              rfcommChannel == nil, !isConnecting, !suppressAutoConnect else {
             return
         }
         // IOBluetooth `isConnected()` is unreliable for these buds (returns false
@@ -253,10 +270,9 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         else { return }
 
         lastAutoAttempt = Date()
-        silentConnect = true
         autoConnectShouldNotify = true
         let model = BudsModel.detect(from: device.name ?? "") ?? .buds4Pro
-        connect(to: DiscoveredDevice(device: device), model: model)
+        connect(to: DiscoveredDevice(device: device), model: model, silent: true)
     }
 
     func sendMessage(_ message: SppMessage) {
@@ -464,6 +480,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     private func markConnected() {
         guard !isConnected, rfcommChannel != nil else { return }
         cancelConnectTimeout()
+        isConnecting = false
         silentConnect = false
         isConnected = true
         stopScanning()
@@ -478,6 +495,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// connects; auto-connect attempts fail quietly.
     private func failConnect(_ message: String) {
         cancelConnectTimeout()
+        isConnecting = false
         rfcommChannel?.close()
         rfcommChannel = nil
         let silent = silentConnect
