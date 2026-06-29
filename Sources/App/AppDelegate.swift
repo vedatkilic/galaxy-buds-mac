@@ -7,6 +7,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let bluetooth = BluetoothManager()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Single instance: if another copy (same bundle id) is already running,
+        // hand off to it and quit. Two instances would fight over the one RFCOMM
+        // channel to the buds and show duplicate menu-bar icons.
+        let me = NSRunningApplication.current
+        let others = NSRunningApplication
+            .runningApplications(withBundleIdentifier: me.bundleIdentifier ?? "")
+            .filter { $0 != me }
+        if let existing = others.first {
+            existing.activate(options: [])
+            NSApp.terminate(nil)
+            return
+        }
         // An accessory app has no menu bar of its own, so install a minimal main
         // menu purely to wire up the standard ⌘Q quit key equivalent.
         setupMainMenu()
