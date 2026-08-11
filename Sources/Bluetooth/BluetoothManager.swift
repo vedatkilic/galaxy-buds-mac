@@ -36,6 +36,10 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// fails. Guards against overlapping attempts (auto-connect racing the
     /// wizard) that would otherwise reset the timeout and clobber `silentConnect`.
     private var isConnecting = false
+    /// Current auto-retry attempt (0 = first try). Connection failures trigger
+    /// up to `maxConnectRetries` automatic retries before surfacing an error.
+    private var connectRetryCount = 0
+    private let maxConnectRetries = 2
     /// While true, the buds were intentionally handed off to the phone: the Mac
     /// drops the full Bluetooth link (A2DP audio + SPP control) so the buds fall
     /// back to the phone, and auto-reconnect is suppressed until the user
@@ -176,27 +180,58 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         connectedModel = model
         connectedName = device.name
         connectedDevice = device.device
+        connectRetryCount = 0
         startConnectTimeout()
+        attemptConnection(device: device, model: model)
+    }
 
+    /// Runs one connection attempt: resolves the RFCOMM channel off the main
+    /// thread, then opens it on the main thread. On failure, retries up to
+    /// `maxConnectRetries` times before giving up.
+    private func attemptConnection(device: DiscoveredDevice, model: BudsModel) {
         let target = device.device
         let uuidString = model.serviceUUID
 
         // Resolve the RFCOMM channel off the main thread: this ensures the
         // baseband link is up and performs/polls the SDP query (which can take
-        // up to ~2s). The actual channel is then opened back on the main thread
+        // up to ~8s). The actual channel is then opened back on the main thread
         // so its data callbacks bind to the always-pumping main run loop.
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let channelId = self.resolveChannel(target: target, uuidString: uuidString)
             await MainActor.run {
+                guard self.isConnecting else { return }
                 if let channelId {
                     self.connectViaRFCOMM(device: target, channelId: channelId)
                 } else {
-                    self.failConnect(String(
-                        localized: "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth."))
+                    self.handleConnectFailure(device: device, model: model)
                 }
             }
         }
+    }
+
+    /// Handles a single connection attempt failure: retries automatically up to
+    /// `maxConnectRetries` times (with a short backoff between tries) before
+    /// surfacing the error to the user. Auto-connect (silent) attempts always
+    /// fail quietly regardless of retry count.
+    private func handleConnectFailure(device: DiscoveredDevice, model: BudsModel) {
+        guard isConnecting else { return }
+        connectRetryCount += 1
+
+        if connectRetryCount <= maxConnectRetries {
+            // Retry after a short backoff (1s, then 2s).
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await Task.sleep(for: .seconds(self.connectRetryCount))
+                guard self.isConnecting else { return }
+                self.attemptConnection(device: device, model: model)
+            }
+            return
+        }
+
+        // All retries exhausted — surface the error (unless silent/auto-connect).
+        failConnect(String(
+            localized: "Couldn't connect after multiple tries. Make sure the earbuds aren't connected to another device, then try again."))
     }
 
     /// Ensures the baseband connection, runs an SDP query, and polls for the
@@ -215,13 +250,16 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         let uuidBytes = uuidStringToBytes(uuidString)
         let uuid = IOBluetoothSDPUUID(bytes: uuidBytes, length: uuidBytes.count)
 
-        // Try cached SDP first, then force a fresh query and poll for ~2.5s.
+        // Try cached SDP first, then force a fresh query and poll for ~8s.
+        // The original 2.5s window was too short — the buds often take 3-5s to
+        // expose their SPP service after the baseband link comes up, especially
+        // when recovering from a phone multipoint session.
         if let channel = rfcommChannel(on: target, uuid: uuid) {
             return channel
         }
         _ = target.performSDPQuery(nil)
-        for _ in 0..<25 {
-            Thread.sleep(forTimeInterval: 0.1)
+        for _ in 0..<40 {
+            Thread.sleep(forTimeInterval: 0.2)
             if let channel = rfcommChannel(on: target, uuid: uuid) {
                 return channel
             }
@@ -596,7 +634,9 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     private func startConnectTimeout() {
         connectTimeoutTask?.cancel()
         connectTimeoutTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(12))
+            // 30s allows for up to 2 retries (each try can take ~8s SDP + ~1-2s
+            // backoff) before the timeout fires.
+            try? await Task.sleep(for: .seconds(30))
             guard !Task.isCancelled, !self.isConnected else { return }
             self.failConnect(String(
                 localized: "Connection timed out. The earbuds may not be exposing the control channel right now."))
