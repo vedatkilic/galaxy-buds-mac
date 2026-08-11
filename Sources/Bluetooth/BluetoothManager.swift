@@ -68,6 +68,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// for future connections.
     func startAutoConnect() {
         autoConnectArmed = true
+        loadCustomEqualizer()
         primeBluetoothPermission()
         if bluetoothReady { armConnectNotifications() }
     }
@@ -374,6 +375,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     }
 
     func setEqualizer(_ preset: EqualizerPreset) {
+        if preset == .custom {
+            // Custom preset: push the saved band table then select it. The
+            // EQUALIZER wire value for custom is 7 (custom index 6 + 1).
+            setCustomEqualizer(bands: status.customEqualizerBands)
+            return
+        }
         // Modern models (Buds3/4 Pro) expect a single byte: 0 = off, else
         // preset+1. Our EqualizerPreset raw values already match that wire scale
         // (off=0, bassBoost=1 … trebleBoost=5).
@@ -383,6 +390,44 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         )
         sendMessage(msg)
         status.equalizerPreset = preset
+        status.customEqualizerEnabled = false
+    }
+
+    /// Sets the custom 9-band equalizer. Each band is a signed gain in -10...+10.
+    /// Sends the band table (id 137) then selects the custom preset via the
+    /// EQUALIZER message (value 7 = custom index 6 + 1), matching the upstream
+    /// protocol verified against Buds4 Pro hardware. Persists the curve so it
+    /// survives disconnects/restarts.
+    func setCustomEqualizer(bands: [Int]) {
+        let clamped = (0..<9).map { i in
+            Int8(max(-10, min(10, bands.indices.contains(i) ? bands[i] : 0)))
+        }
+        var payload = Data([9]) // band count
+        for band in clamped {
+            payload.append(UInt8(bitPattern: band))
+        }
+        sendMessage(SppMessage(messageId: .customEqualize, payload: payload))
+        sendMessage(SppMessage(messageId: .equalizer, payload: Data([7])))
+        let intBands = clamped.map { Int($0) }
+        status.customEqualizerBands = intBands
+        status.customEqualizerEnabled = true
+        status.equalizerPreset = .custom
+        saveCustomEqualizer(intBands)
+    }
+
+    /// Updates a single custom EQ band in-place and re-pushes the table.
+    func setCustomEqualizerBand(_ index: Int, value: Int) {
+        var bands = status.customEqualizerBands
+        guard bands.indices.contains(index) else { return }
+        bands[index] = max(-10, min(10, value))
+        setCustomEqualizer(bands: bands)
+    }
+
+    /// Asks the device for its full EQ preset band-curve table (id 105). The
+    /// response is parsed in `parseCustomEqualizerData`. Used to visualise each
+    /// preset's shape on the equalizer graph.
+    func requestPresetCurves() {
+        sendMessage(SppMessage(messageId: .customEqualizeRecv))
     }
 
     func setTouchpadLock(_ locked: Bool) {
@@ -493,6 +538,11 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         isConnected = true
         stopScanning()
         sendInitialHandshake()
+        // Fetch the device's EQ preset curves so the graph can visualise each
+        // preset's shape. Best-effort: some firmware replies flat or not at all.
+        if connectedModel?.supportsCustomEqualizer == true {
+            requestPresetCurves()
+        }
         if autoConnectShouldNotify {
             autoConnectShouldNotify = false
             onAutoConnected?()
@@ -617,6 +667,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             parseSerialNumber(message.payload)
         case .checkFitResult:
             parseFitResult(message.payload)
+        case .customEqualizeRecv:
+            parseCustomEqualizerData(message.payload)
         default:
             break
         }
@@ -646,6 +698,64 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         guard payload.count >= 2 else { return }
         status.fitLeft = BudsStatus.FitResult(rawValue: Int(payload[0])) ?? .unknown
         status.fitRight = BudsStatus.FitResult(rawValue: Int(payload[1])) ?? .unknown
+    }
+
+    /// Parses the CUSTOM_EQUALIZE_RECV payload:
+    ///   [presetCount][bandCount][(presetCount - 1) * bandCount preset table][bandCount custom gains]
+    /// The flat first preset is omitted on the wire. Each gain is a signed byte.
+    /// Populates `presetEqualizerCurves` (for the graph) and, if the custom
+    /// block is present and non-flat, `customEqualizerBands`.
+    private func parseCustomEqualizerData(_ payload: Data) {
+        guard payload.count >= 2 else { return }
+        let presetCount = Int(payload[0])
+        let bandCount = Int(payload[1])
+        guard bandCount > 0, presetCount >= 1 else { return }
+
+        // Reconstruct the full preset table. Preset 0 (Normal) is flat and not
+        // sent; presets 1…presetCount-1 follow at offset 2.
+        var curves: [[Int]] = [Array(repeating: 0, count: bandCount)] // Normal
+        let tableStart = 2
+        for p in 1..<presetCount {
+            let base = tableStart + (p - 1) * bandCount
+            guard base + bandCount <= payload.count else { break }
+            var bands: [Int] = []
+            for i in 0..<bandCount {
+                bands.append(Int(Int8(bitPattern: payload[base + i])))
+            }
+            curves.append(bands)
+        }
+        if !curves.isEmpty { status.presetEqualizerCurves = curves }
+
+        // Custom band gains follow the preset table.
+        let customStart = 2 + (presetCount - 1) * bandCount
+        guard customStart + bandCount <= payload.count else { return }
+        var custom: [Int] = []
+        for i in 0..<bandCount {
+            custom.append(Int(Int8(bitPattern: payload[customStart + i])))
+        }
+        // Only adopt the device's custom bands if they're non-flat AND the user
+        // has no saved curve of their own (first-connect seeding).
+        if !custom.allSatisfy({ $0 == 0 }), status.customEqualizerBands.allSatisfy({ $0 == 0 }) {
+            status.customEqualizerBands = custom
+        }
+    }
+
+    // MARK: - Custom EQ persistence
+
+    /// UserDefaults key for the persisted custom EQ band table.
+    private let customEQKey = "com.nivorbit.budsapp.customEqualizerBands"
+
+    /// Loads the saved custom EQ bands into `status`, if any. Called once on
+    /// startup so the user's last custom curve survives reconnects/restarts.
+    private func loadCustomEqualizer() {
+        if let saved = UserDefaults.standard.array(forKey: customEQKey) as? [Int],
+           saved.count == 9 {
+            status.customEqualizerBands = saved
+        }
+    }
+
+    private func saveCustomEqualizer(_ bands: [Int]) {
+        UserDefaults.standard.set(bands, forKey: customEQKey)
     }
 
     private func parseStatusUpdate(_ payload: Data) {
@@ -715,13 +825,17 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.isRightWearing = status.placementRight == .wearing
 
         status.batteryCase = Int(payload[7])
-        status.ambientSoundEnabled = payload[8] != 0
-        status.ambientVoiceFocus = payload[9] != 0
-
-        // payload[9] = EQ on SppNew models (0=off, 1..5 = preset+1), payload[12]
-        // = noise control mode (0=Off,1=ANC,2=Ambient,3=Adaptive), per
-        // GalaxyBudsClient's decoder.
-        status.equalizerPreset = EqualizerPreset(rawValue: Int(payload[9])) ?? .off
+        // payload[8] = AdjustSoundSync on modern models. payload[9] = EQ preset
+        // (0=off, 1..5 = preset+1, 7 = custom). payload[12] = noise control mode
+        // (0=Off,1=ANC,2=Ambient,3=Adaptive). Per GalaxyBudsClient's decoder.
+        let eqMode = Int(payload[9])
+        if eqMode == 7 {
+            status.equalizerPreset = .custom
+            status.customEqualizerEnabled = true
+        } else {
+            status.equalizerPreset = EqualizerPreset(rawValue: eqMode) ?? .off
+            status.customEqualizerEnabled = false
+        }
         status.noiseControlMode = NoiseControlMode(rawValue: Int(payload[12])) ?? .off
 
         // payload[14] requires at least 15 bytes; older firmware sends fewer.

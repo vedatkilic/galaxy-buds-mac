@@ -106,6 +106,18 @@ enum BudsModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Whether the model supports the per-band custom equalizer (9 signed gain
+    /// bands, -10..+10). Only the newest models expose the CUSTOM_EQUALIZE SPP
+    /// messages; older models offer presets only.
+    var supportsCustomEqualizer: Bool {
+        switch self {
+        case .buds3Pro, .buds3Fe, .buds4, .buds4Pro:
+            return true
+        default:
+            return false
+        }
+    }
+
     var maxAmbientVolume: Int {
         switch self {
         case .buds:

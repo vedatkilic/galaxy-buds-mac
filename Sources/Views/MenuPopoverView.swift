@@ -111,12 +111,18 @@ struct MenuPopoverView: View {
     }
 
     private var equalizerRow: some View {
-        HStack(spacing: 8) {
+        // Models with the full custom EQ UI expose the .custom preset here; older
+        // models only see the fixed presets (Normal/Bass Boost/…/Treble Boost).
+        let supportsCustom = bluetooth.connectedModel?.supportsCustomEqualizer == true
+        let presets: [EqualizerPreset] = supportsCustom
+            ? EqualizerPreset.allCases
+            : EqualizerPreset.allCases.filter { $0 != .custom }
+        return HStack(spacing: 8) {
             Image(systemName: "slider.horizontal.3").font(.system(size: 13)).foregroundStyle(.secondary)
             Text("Equalizer").font(.system(size: 12)).foregroundStyle(.secondary)
             Spacer()
             Menu {
-                ForEach(EqualizerPreset.allCases) { preset in
+                ForEach(presets) { preset in
                     Button { bluetooth.setEqualizer(preset) } label: {
                         Text(LocalizedStringKey(preset.displayName))
                     }

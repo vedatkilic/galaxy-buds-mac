@@ -62,6 +62,15 @@ final class BudsStatus: @unchecked Sendable {
     var seamlessConnectionEnabled: Bool = false
 
     var equalizerPreset: EqualizerPreset = .off
+    /// Per-band gains for the custom 9-band equalizer (Buds4 Pro). Each band is
+    /// a signed value in -10...+10. Index 0 = lowest band, 8 = highest.
+    var customEqualizerBands: [Int] = Array(repeating: 0, count: 9)
+    var customEqualizerEnabled: Bool = false
+    /// Per-preset band curves reported by the device via CUSTOM_EQUALIZE_RECV.
+    /// Used to visualise each preset's shape on the graph. Index 0 = Normal,
+    /// 1 = Bass Boost, … matching EqualizerPreset (excluding .custom). Each
+    /// entry is 9 signed gains. Empty until the device responds.
+    var presetEqualizerCurves: [[Int]] = []
     var touchpadLocked: Bool = false
 
     var deviceColor: DeviceColor = .black

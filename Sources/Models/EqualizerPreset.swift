@@ -7,6 +7,7 @@ enum EqualizerPreset: Int, CaseIterable, Identifiable, Sendable {
     case dynamic = 3
     case clear = 4
     case trebleBoost = 5
+    case custom = 6
 
     var id: Int { rawValue }
 
@@ -18,6 +19,7 @@ enum EqualizerPreset: Int, CaseIterable, Identifiable, Sendable {
         case .dynamic: "Dynamic"
         case .clear: "Clear"
         case .trebleBoost: "Treble Boost"
+        case .custom: "Custom"
         }
     }
 
@@ -29,6 +31,7 @@ enum EqualizerPreset: Int, CaseIterable, Identifiable, Sendable {
         case .dynamic: "bolt"
         case .clear: "sparkles"
         case .trebleBoost: "speaker.wave.1"
+        case .custom: "slider.vertical.3"
         }
     }
 }

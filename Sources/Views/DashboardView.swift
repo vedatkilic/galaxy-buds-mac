@@ -8,6 +8,7 @@ struct DashboardView: View {
     @Bindable var bluetooth: BluetoothManager
     @State private var showSoundAnc = false
     @State private var showEarbudControls = false
+    @State private var showEqualizer = false
     @State private var showFindMyEarbuds = false
     @State private var showAbout = false
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
@@ -21,6 +22,8 @@ struct DashboardView: View {
             SoundAncView(bluetooth: bluetooth) { showSoundAnc = false }
         } else if showEarbudControls {
             EarbudControlsView(bluetooth: bluetooth) { showEarbudControls = false }
+        } else if showEqualizer {
+            EqualizerView(bluetooth: bluetooth) { showEqualizer = false }
         } else if showFindMyEarbuds {
             FindMyEarbudsView(bluetooth: bluetooth) { showFindMyEarbuds = false }
         } else if showAbout {
@@ -170,21 +173,25 @@ struct DashboardView: View {
                 }
             }
             group {
-                row(icon: "slider.horizontal.3", title: "Equalizer") {
-                    Menu {
-                        ForEach(EqualizerPreset.allCases) { preset in
-                            Button { bluetooth.setEqualizer(preset) } label: {
-                                Text(LocalizedStringKey(preset.displayName))
+                if bluetooth.connectedModel?.supportsCustomEqualizer == true {
+                    navRow(icon: "slider.vertical.3", title: "Equalizer") { showEqualizer = true }
+                } else {
+                    row(icon: "slider.horizontal.3", title: "Equalizer") {
+                        Menu {
+                            ForEach(EqualizerPreset.allCases.filter { $0 != .custom }) { preset in
+                                Button { bluetooth.setEqualizer(preset) } label: {
+                                    Text(LocalizedStringKey(preset.displayName))
+                                }
                             }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(LocalizedStringKey(status.equalizerPreset.displayName))
+                                Image(systemName: "chevron.up.chevron.down").font(.system(size: 11))
+                            }
+                            .foregroundStyle(.secondary)
                         }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(LocalizedStringKey(status.equalizerPreset.displayName))
-                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 11))
-                        }
-                        .foregroundStyle(.secondary)
+                        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                     }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
                 }
             }
             group {
