@@ -36,6 +36,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// fails. Guards against overlapping attempts (auto-connect racing the
     /// wizard) that would otherwise reset the timeout and clobber `silentConnect`.
     private var isConnecting = false
+    /// While true, the buds were intentionally handed off to the phone: the Mac
+    /// drops the full Bluetooth link (A2DP audio + SPP control) so the buds fall
+    /// back to the phone, and auto-reconnect is suppressed until the user
+    /// requests it back. macOS exposes no API to drop only A2DP, so this is the
+    /// only way to make the buds release the Mac's audio claim.
+    var handedOffToPhone = false
     private var connectedDevice: IOBluetoothDevice?
     private var inquiry: IOBluetoothDeviceInquiry?
     private var centralManager: CBCentralManager?
@@ -95,7 +101,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
     /// Connects to the first already-connected, paired Galaxy Buds, if any.
     private func attemptAutoConnect(notify: Bool) {
-        guard bluetoothReady, !isConnected, rfcommChannel == nil, !isConnecting else { return }
+        guard bluetoothReady, !isConnected, rfcommChannel == nil, !isConnecting,
+              !handedOffToPhone else { return }
         guard let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else { return }
         for device in paired where device.isConnected() && isGalaxyBudsName(device.name ?? "") {
             autoConnectShouldNotify = notify
@@ -251,12 +258,37 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Hands the buds off to the phone: drops the full Bluetooth link (A2DP
+    /// audio + SPP control) so the buds fall back to the phone for audio, and
+    /// suppresses auto-reconnect until `reclaimFromPhone()` is called. This is
+    /// the only way to make the buds release the Mac's audio claim, since macOS
+    /// has no API to drop just the A2DP profile while keeping SPP.
+    func handOffToPhone() {
+        handedOffToPhone = true
+        rfcommChannel?.close()
+        rfcommChannel = nil
+        connectedDevice?.closeConnection()
+        isConnected = false
+        isConnecting = false
+        cancelConnectTimeout()
+    }
+
+    /// Reclaims the buds on the Mac: clears the hand-off and immediately
+    /// attempts to reconnect (control channel + audio).
+    func reclaimFromPhone() {
+        handedOffToPhone = false
+        suppressAutoConnect = false
+        lastAutoAttempt = nil
+        pollAutoConnect()
+    }
+
     /// Polled (~every 2s) by the app: connects to an already-connected paired
     /// Galaxy Buds. More reliable than IOBluetooth connect notifications, which
     /// don't fire dependably on all macOS versions.
     func pollAutoConnect() {
         guard autoConnectArmed, bluetoothReady, !isConnected,
-              rfcommChannel == nil, !isConnecting, !suppressAutoConnect else {
+              rfcommChannel == nil, !isConnecting, !suppressAutoConnect,
+              !handedOffToPhone else {
             return
         }
         // IOBluetooth `isConnected()` is unreliable for these buds (returns false

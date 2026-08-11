@@ -14,6 +14,8 @@ struct MenuPopoverView: View {
         VStack(spacing: 16) {
             if bluetooth.isConnected {
                 connected
+            } else if bluetooth.handedOffToPhone {
+                handedOff
             } else {
                 disconnected
             }
@@ -142,19 +144,65 @@ struct MenuPopoverView: View {
     private var footer: some View {
         VStack(spacing: 10) {
             Divider()
-            Button(role: .destructive) {
-                NSApplication.shared.terminate(nil)
+            HStack(spacing: 10) {
+                if bluetooth.isConnected && !bluetooth.handedOffToPhone {
+                    Button {
+                        bluetooth.handOffToPhone()
+                    } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "iphone").font(.system(size: 13))
+                            Text("To phone").font(.system(size: 9))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Send audio to phone")
+                }
+
+                Button(role: .destructive) {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: "power").font(.system(size: 13))
+                        Text("Quit").font(.system(size: 9))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Shown while the buds are intentionally handed off to the phone: audio
+    /// + control are both down, and auto-reconnect is suppressed.
+    private var handedOff: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "iphone.radiowaves.left.and.right")
+                .font(.system(size: 36))
+                .foregroundStyle(tint)
+            VStack(spacing: 3) {
+                Text(verbatim: bluetooth.connectedName
+                     ?? bluetooth.connectedModel?.rawValue ?? "Galaxy Buds")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Audio on phone")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                bluetooth.reclaimFromPhone()
             } label: {
                 HStack(spacing: 6) {
-                    Image(systemName: "power")
-                    Text("Quit")
+                    Image(systemName: "laptopcomputer")
+                    Text("Connect on Mac")
                 }
-                .font(.system(size: 12))
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
         }
+        .padding(.vertical, 10)
     }
 
     private var disconnected: some View {
