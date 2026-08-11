@@ -870,9 +870,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         }
         status.noiseControlMode = NoiseControlMode(rawValue: Int(payload[12])) ?? .off
 
-        // payload[14] requires at least 15 bytes; older firmware sends fewer.
-        if payload.count > 14 {
-            status.deviceColor = BudsStatus.DeviceColor(rawValue: Int(payload[14] & 0x0F)) ?? .black
+        // Device color: the left earbud's colour sits as a little-endian Int16
+        // at payload[14..16]. We only need the low byte to resolve our enum, and
+        // older firmware may send fewer than 16 bytes.
+        if payload.count >= 16 {
+            let colorByte = payload[14]
+            status.deviceColor = BudsStatus.DeviceColor(rawValue: Int(colorByte)) ?? .black
         }
 
         // payload[19] = Seamless Connection (inverted: 0 = enabled). Available
@@ -885,23 +888,11 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     }
 
     /// Reads the Sound & ANC detail fields from the Buds3/4 Pro extended-status
-    /// payload (offsets per GalaxyBudsClient's `>= Buds3 Pro` decoder path).
-    /// Each offset is guarded since older firmware sends shorter payloads.
+    /// payload. Offsets follow GalaxyBudsClient's `>= Buds3 Pro` decoder path
+    /// (which differ from the BudsPro/Buds2Pro paths). Each offset is guarded
+    /// since older firmware sends shorter payloads.
     private func parseSoundAndAncDetails(_ payload: Data) {
         func byte(_ i: Int) -> Int? { payload.count > i ? Int(payload[i]) : nil }
-
-        if let v = byte(23) { status.ambientSoundVolume = v }
-        if let v = byte(26) { status.detectConversations = v == 1 }
-        if let v = byte(27) { status.detectConversationsDuration = min(v, 2) }
-        if let v = byte(29) { status.ambientCustomEnabled = v == 1 }
-        if let v = byte(30) {
-            status.ambientCustomLeft = (v >> 4) & 0x0F
-            status.ambientCustomRight = v & 0x0F
-        }
-        if let v = byte(31) { status.ambientTone = v }
-        if let v = byte(32) { status.ncWithOneEarbud = v == 1 }
-        if let v = byte(33) { status.sidetone = v == 1 }
-        if let v = byte(34) { status.ambientDuringCalls = v == 0 } // inverted
 
         // payload[10] bit 7 (inverted) = touchpad lock; payload[11] nibbles =
         // per-side hold action; payload[21] bits = noise-control cycle subset.
@@ -914,6 +905,24 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             status.noiseCycleRight = cycle(amb: v & 1 != 0, off: v & 4 != 0, anc: v & 8 != 0)
             status.noiseCycleLeft = cycle(amb: v & 16 != 0, off: v & 64 != 0, anc: v & 128 != 0)
         }
+
+        // Buds3/4 Pro detail fields (revision-gated in the upstream decoder).
+        if let v = byte(23) { status.ambientSoundVolume = v }
+        // payload[24] = ANC strength (0 = Low, 1 = High).
+        if let v = byte(24) { status.ancLevelHigh = v == 1 }
+        if let v = byte(26) { status.detectConversations = v == 1 }
+        if let v = byte(27) { status.detectConversationsDuration = min(v, 2) }
+        // rev8+: one-earbud NC + ambient customisation.
+        if let v = byte(32) { status.ncWithOneEarbud = v == 1 }
+        if let v = byte(33) { status.ambientCustomEnabled = v == 1 }
+        if let v = byte(34) {
+            status.ambientCustomLeft = (v >> 4) & 0x0F
+            status.ambientCustomRight = v & 0x0F
+        }
+        if let v = byte(35) { status.ambientTone = v }
+        // rev9+: sidetone; rev10+: call path control (inverted).
+        if let v = byte(36) { status.sidetone = v == 1 }
+        if let v = byte(37) { status.ambientDuringCalls = v == 0 }
     }
 
     private func cycle(amb: Bool, off: Bool, anc: Bool) -> NoiseControlCycle {
