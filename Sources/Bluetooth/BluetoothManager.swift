@@ -613,6 +613,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         if connectedModel?.supportsCustomEqualizer == true {
             requestPresetCurves()
         }
+        // Force Seamless Connection on at connect: without multipoint enabled,
+        // a paired phone claims the single bud link and the app can no longer
+        // reach the buds. The user controls audio via hand-off instead.
+        if connectedModel?.supportsSeamlessConnection == true {
+            setSeamlessConnection(true)
+        }
         if autoConnectShouldNotify {
             autoConnectShouldNotify = false
             onAutoConnected?()
