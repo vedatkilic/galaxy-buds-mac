@@ -22,6 +22,9 @@ struct SoundAncView: View {
                         conversationsSection
                     }
                     callsSection
+                    if bluetooth.connectedModel?.supportsSeamlessConnection == true {
+                        connectionSection
+                    }
                 }
                 .padding(18)
             }
@@ -146,6 +149,13 @@ struct SoundAncView: View {
             Divider()
             toggleRow("Ambient sound during calls",
                       isOn: status.ambientDuringCalls) { bluetooth.setAmbientDuringCalls($0) }
+        }
+    }
+
+    private var connectionSection: some View {
+        section("Connection") {
+            toggleRow("Seamless connection",
+                      isOn: status.seamlessConnectionEnabled) { bluetooth.setSeamlessConnection($0) }
         }
     }
 

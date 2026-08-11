@@ -40,4 +40,8 @@ enum MessageId: UInt8, Sendable {
     case noiseControlsUpdate = 119  // buds → host: ANC changed on the earbud
     case noiseControls = 120        // host → buds: set ANC/Ambient/Off/Adaptive
     case pairingMode = 114
+
+    // Multipoint / Seamless Connection. The wire value is inverted: 0 = enabled,
+    // 1 = disabled (matches the upstream protocol and the extended-status field).
+    case setSeamlessConnection = 175
 }

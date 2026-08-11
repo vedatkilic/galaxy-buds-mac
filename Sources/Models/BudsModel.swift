@@ -93,6 +93,19 @@ enum BudsModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Whether the model supports Samsung Seamless Connection (a.k.a. Bluetooth
+    /// multipoint between two host devices). Per the upstream protocol spec this
+    /// is available on every model from Buds Live onward; the legacy 1st-gen
+    /// Buds and Buds+ predate the feature.
+    var supportsSeamlessConnection: Bool {
+        switch self {
+        case .buds, .budsPlus:
+            return false
+        default:
+            return true
+        }
+    }
+
     var maxAmbientVolume: Int {
         switch self {
         case .buds:

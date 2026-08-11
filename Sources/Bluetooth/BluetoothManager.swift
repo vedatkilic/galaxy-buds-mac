@@ -365,6 +365,14 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.ambientDuringCalls = enabled
     }
 
+    /// Toggles Samsung Seamless Connection (Bluetooth multipoint between two
+    /// host devices). The wire value is inverted: 0 = enabled, 1 = disabled.
+    func setSeamlessConnection(_ enabled: Bool) {
+        sendMessage(SppMessage(
+            messageId: .setSeamlessConnection, payload: Data([enabled ? 0 : 1])))
+        status.seamlessConnectionEnabled = enabled
+    }
+
     func setEqualizer(_ preset: EqualizerPreset) {
         // Modern models (Buds3/4 Pro) expect a single byte: 0 = off, else
         // preset+1. Our EqualizerPreset raw values already match that wire scale
@@ -719,6 +727,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // payload[14] requires at least 15 bytes; older firmware sends fewer.
         if payload.count > 14 {
             status.deviceColor = BudsStatus.DeviceColor(rawValue: Int(payload[14] & 0x0F)) ?? .black
+        }
+
+        // payload[19] = Seamless Connection (inverted: 0 = enabled). Available
+        // on every model from Buds Live onward; older firmware omits the field.
+        if payload.count > 19 {
+            status.seamlessConnectionEnabled = (payload[19] == 0)
         }
 
         parseSoundAndAncDetails(payload)

@@ -57,6 +57,10 @@ final class BudsStatus: @unchecked Sendable {
         case unknown = 99
     }
 
+    // Connection
+    /// Samsung Seamless Connection (Bluetooth multipoint between two hosts).
+    var seamlessConnectionEnabled: Bool = false
+
     var equalizerPreset: EqualizerPreset = .off
     var touchpadLocked: Bool = false
 
