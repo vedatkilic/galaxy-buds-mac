@@ -641,9 +641,21 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     }
 
     private func parseStatusUpdate(_ payload: Data) {
-        guard payload.count >= 3 else { return }
-        status.batteryLeft = Int(payload[0])
-        status.batteryRight = Int(payload[1])
+        let isLegacy = connectedModel?.usesLegacyProtocol ?? false
+        if isLegacy {
+            // 1st-gen Buds: [earType, batteryL, batteryR, ...]
+            guard payload.count >= 3 else { return }
+            status.batteryLeft = Int(payload[1])
+            status.batteryRight = Int(payload[2])
+        } else {
+            // Modern models: [revision, batteryL, batteryR, isCoupled, mainConn,
+            // placement, batteryCase, ...] — note batteryL is at offset 1, NOT 0.
+            // Reading offset 0 as batteryLeft was surfacing the firmware revision
+            // (typically 1) as "1%" for the left bud.
+            guard payload.count >= 3 else { return }
+            status.batteryLeft = Int(payload[1])
+            status.batteryRight = Int(payload[2])
+        }
     }
 
     private func parseExtendedStatusUpdate(_ payload: Data) {
