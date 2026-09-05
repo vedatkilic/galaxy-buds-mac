@@ -103,3 +103,13 @@
 "Test failed" = "Test başarısız";
 "Quit" = "Çıkış";
 "Quit Galaxy Buds" = "Galaxy Buds'tan çık";
+
+"To phone" = "Telefona";
+"Audio on phone" = "Ses telefonda";
+"Connect on Mac" = "Mac'e bağlan";
+"Send audio to phone" = "Sesi telefona aktar";
+"Preset" = "Hazır Ayar";
+"Mode" = "Mod";
+"Custom" = "Özel";
+"Reset to flat" = "Düze sıfırla";
+"Preset curve (read-only)" = "Hazır ayar eğrisi (salt okunur)";

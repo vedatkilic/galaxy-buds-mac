@@ -103,3 +103,13 @@
 "Test failed" = "测试失败";
 "Quit" = "退出";
 "Quit Galaxy Buds" = "退出 Galaxy Buds";
+
+"To phone" = "发送到手机";
+"Audio on phone" = "音频在手机上";
+"Connect on Mac" = "连接到 Mac";
+"Send audio to phone" = "将音频发送到手机";
+"Preset" = "预设";
+"Mode" = "模式";
+"Custom" = "自定义";
+"Reset to flat" = "重置为平坦";
+"Preset curve (read-only)" = "预设曲线（只读）";

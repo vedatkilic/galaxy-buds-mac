@@ -103,3 +103,13 @@
 "Test failed" = "Test fehlgeschlagen";
 "Quit" = "Beenden";
 "Quit Galaxy Buds" = "Galaxy Buds beenden";
+
+"To phone" = "Ans Handy";
+"Audio on phone" = "Audio am Handy";
+"Connect on Mac" = "Mit Mac verbinden";
+"Send audio to phone" = "Audio ans Handy senden";
+"Preset" = "Voreinstellung";
+"Mode" = "Modus";
+"Custom" = "Benutzerdefiniert";
+"Reset to flat" = "Auf neutral zurücksetzen";
+"Preset curve (read-only)" = "Voreinstellungskurve (schreibgeschützt)";

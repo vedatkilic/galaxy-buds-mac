@@ -103,3 +103,13 @@
 "Test failed" = "테스트 실패";
 "Quit" = "종료";
 "Quit Galaxy Buds" = "Galaxy Buds 종료";
+
+"To phone" = "폰으로";
+"Audio on phone" = "오디오가 폰에서 재생 중";
+"Connect on Mac" = "Mac에 연결";
+"Send audio to phone" = "오디오를 폰으로 전송";
+"Preset" = "프리셋";
+"Mode" = "모드";
+"Custom" = "사용자 설정";
+"Reset to flat" = "평탄하게 초기화";
+"Preset curve (read-only)" = "프리셋 곡선 (읽기 전용)";

@@ -103,3 +103,13 @@
 "Test failed" = "Test failed";
 "Quit" = "Quit";
 "Quit Galaxy Buds" = "Quit Galaxy Buds";
+
+"To phone" = "To phone";
+"Audio on phone" = "Audio on phone";
+"Connect on Mac" = "Connect on Mac";
+"Send audio to phone" = "Send audio to phone";
+"Preset" = "Preset";
+"Mode" = "Mode";
+"Custom" = "Custom";
+"Reset to flat" = "Reset to flat";
+"Preset curve (read-only)" = "Preset curve (read-only)";

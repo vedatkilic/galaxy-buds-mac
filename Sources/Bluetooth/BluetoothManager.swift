@@ -814,7 +814,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // Only adopt the device's custom bands if they're non-flat AND the user
         // has no saved curve of their own (first-connect seeding).
         if !custom.allSatisfy({ $0 == 0 }), status.customEqualizerBands.allSatisfy({ $0 == 0 }) {
-            status.customEqualizerBands = custom
+            // CUSTOM_EQUALIZE (send) and the EQ graph are both fixed at 9 bands,
+            // so normalise here rather than letting a different firmware band
+            // count reach the UI.
+            status.customEqualizerBands = (0..<9).map {
+                custom.indices.contains($0) ? custom[$0] : 0
+            }
         }
     }
 

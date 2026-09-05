@@ -21,12 +21,19 @@ struct EqualizerView: View {
     /// Custom is active, otherwise the device-reported curve for the selected
     /// preset (falling back to flat if the device hasn't reported yet).
     private var displayBands: [Int] {
-        if isCustom { return status.customEqualizerBands }
+        if isCustom { return padded(status.customEqualizerBands) }
         let idx = status.equalizerPreset.rawValue
         if idx < status.presetEqualizerCurves.count {
-            return status.presetEqualizerCurves[idx]
+            return padded(status.presetEqualizerCurves[idx])
         }
         return Array(repeating: 0, count: 9)
+    }
+
+    /// The graph is a fixed 9-band control, but the device reports its own band
+    /// count in CUSTOM_EQUALIZE_RECV. Pad or truncate so indexing a bar is
+    /// always safe, whatever the firmware sends.
+    private func padded(_ bands: [Int]) -> [Int] {
+        (0..<9).map { bands.indices.contains($0) ? bands[$0] : 0 }
     }
 
     var body: some View {

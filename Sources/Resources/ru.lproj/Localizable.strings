@@ -103,3 +103,13 @@
 "Test failed" = "Тест не пройден";
 "Quit" = "Выход";
 "Quit Galaxy Buds" = "Завершить Galaxy Buds";
+
+"To phone" = "На телефон";
+"Audio on phone" = "Звук на телефоне";
+"Connect on Mac" = "Подключить к Mac";
+"Send audio to phone" = "Передать звук на телефон";
+"Preset" = "Пресет";
+"Mode" = "Режим";
+"Custom" = "Свой";
+"Reset to flat" = "Сбросить до нуля";
+"Preset curve (read-only)" = "Кривая пресета (только чтение)";

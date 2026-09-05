@@ -103,3 +103,13 @@
 "Test failed" = "テスト失敗";
 "Quit" = "終了";
 "Quit Galaxy Buds" = "Galaxy Buds を終了";
+
+"To phone" = "スマホへ";
+"Audio on phone" = "音声はスマホで再生中";
+"Connect on Mac" = "Macに接続";
+"Send audio to phone" = "音声をスマホに転送";
+"Preset" = "プリセット";
+"Mode" = "モード";
+"Custom" = "カスタム";
+"Reset to flat" = "フラットに戻す";
+"Preset curve (read-only)" = "プリセットカーブ（読み取り専用）";
