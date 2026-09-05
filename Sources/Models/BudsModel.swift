@@ -46,15 +46,42 @@ enum BudsModel: String, CaseIterable, Identifiable, Sendable {
         return nil
     }
 
+    /// The four SPP service UUIDs Samsung earbuds are known to expose their
+    /// control channel under. `alternative` is the "alt mode" record some
+    /// firmware advertises instead of the usual one.
+    enum ServiceUUID {
+        static let legacy = "00001102-0000-1000-8000-00805f9b34fd"
+        static let standard = "00001101-0000-1000-8000-00805f9b34fb"
+        static let modern = "2e73a4ad-332d-41fc-90e2-16bef06523f2"
+        static let alternative = "f8620674-a1ed-41ab-a8b9-de9ad655729d"
+    }
+
     var serviceUUID: String {
         switch self {
         case .buds:
-            return "00001102-0000-1000-8000-00805f9b34fd"
+            return ServiceUUID.legacy
         case .budsPlus, .budsLive, .budsPro:
-            return "00001101-0000-1000-8000-00805f9b34fb"
+            return ServiceUUID.standard
         default:
-            return "2e73a4ad-332d-41fc-90e2-16bef06523f2"
+            return ServiceUUID.modern
         }
+    }
+
+    /// Every SPP UUID worth probing, the model's expected one first. Firmware
+    /// revisions and Samsung's alternative mode publish the control channel
+    /// under a different record on some units, so a single-UUID lookup leaves
+    /// those devices stuck on "Connecting…" forever. Probing the rest costs
+    /// nothing — they're local lookups against SDP records already fetched.
+    var serviceUUIDCandidates: [String] {
+        let fallbacks = [
+            ServiceUUID.modern, ServiceUUID.standard,
+            ServiceUUID.alternative, ServiceUUID.legacy,
+        ]
+        var candidates = [serviceUUID]
+        for uuid in fallbacks where !candidates.contains(uuid) {
+            candidates.append(uuid)
+        }
+        return candidates
     }
 
     var usesLegacyProtocol: Bool {

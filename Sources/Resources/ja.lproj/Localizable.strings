@@ -43,7 +43,6 @@
 "Find Buds" = "イヤホンを探す";
 "Stop Find" = "検索を停止";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "Galaxy Buds の制御サービスが見つかりません。システム設定 → Bluetooth でイヤホンを削除し、再度ペアリングしてください。";
-"Connection timed out. The earbuds may not be exposing the control channel right now." = "接続がタイムアウトしました。イヤホンが現在、制御チャンネルを公開していない可能性があります。";
 "Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Bluetooth の許可が拒否されました。システム設定 → プライバシーとセキュリティ → Bluetooth で BudsApp を許可してください。";
 "Bluetooth is off. Please turn it on." = "Bluetooth がオフです。オンにしてください。";
 "Listen mode" = "リスニングモード";
@@ -113,3 +112,8 @@
 "Custom" = "カスタム";
 "Reset to flat" = "フラットに戻す";
 "Preset curve (read-only)" = "プリセットカーブ（読み取り専用）";
+
+"Diagnostics" = "診断";
+"Copies the connection log, so you can paste it into a bug report on GitHub." = "接続ログをコピーします。GitHub のバグ報告に貼り付けられます。";
+"Copy diagnostics" = "診断をコピー";
+"Copied" = "コピーしました";

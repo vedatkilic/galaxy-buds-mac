@@ -43,7 +43,6 @@
 "Find Buds" = "查找耳机";
 "Stop Find" = "停止查找";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "未找到 Galaxy Buds 控制服务。请尝试在系统设置 → 蓝牙中移除并重新配对耳机。";
-"Connection timed out. The earbuds may not be exposing the control channel right now." = "连接超时。耳机当前可能未开放控制通道。";
 "Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "蓝牙权限被拒绝。请在系统设置 → 隐私与安全性 → 蓝牙中允许 BudsApp。";
 "Bluetooth is off. Please turn it on." = "蓝牙已关闭。请将其打开。";
 "Listen mode" = "聆听模式";
@@ -113,3 +112,8 @@
 "Custom" = "自定义";
 "Reset to flat" = "重置为平坦";
 "Preset curve (read-only)" = "预设曲线（只读）";
+
+"Diagnostics" = "诊断";
+"Copies the connection log, so you can paste it into a bug report on GitHub." = "复制连接日志，便于粘贴到 GitHub 的问题报告中。";
+"Copy diagnostics" = "复制诊断信息";
+"Copied" = "已复制";

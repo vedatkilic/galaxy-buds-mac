@@ -21,6 +21,7 @@ swiftc -parse-as-library \
   Sources/Models/NoiseControlMode.swift \
   Sources/Models/EqualizerPreset.swift \
   Sources/Models/TouchControls.swift \
+  Sources/Diagnostics/DiagnosticsLog.swift \
   Sources/Bluetooth/CRC16.swift \
   Sources/Bluetooth/MessageId.swift \
   Sources/Bluetooth/SppMessage.swift \

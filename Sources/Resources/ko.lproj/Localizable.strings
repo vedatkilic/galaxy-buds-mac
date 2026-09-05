@@ -43,7 +43,6 @@
 "Find Buds" = "버즈 찾기";
 "Stop Find" = "찾기 중지";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "Galaxy Buds 제어 서비스를 찾을 수 없습니다. 시스템 설정 → Bluetooth에서 이어버드를 제거한 후 다시 페어링해 보세요.";
-"Connection timed out. The earbuds may not be exposing the control channel right now." = "연결 시간이 초과되었습니다. 지금은 이어버드가 제어 채널을 제공하지 않을 수 있습니다.";
 "Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Bluetooth 권한이 거부되었습니다. 시스템 설정 → 개인정보 보호 및 보안 → Bluetooth에서 BudsApp을 허용하세요.";
 "Bluetooth is off. Please turn it on." = "Bluetooth가 꺼져 있습니다. 켜 주세요.";
 "Listen mode" = "듣기 모드";
@@ -113,3 +112,8 @@
 "Custom" = "사용자 설정";
 "Reset to flat" = "평탄하게 초기화";
 "Preset curve (read-only)" = "프리셋 곡선 (읽기 전용)";
+
+"Diagnostics" = "진단";
+"Copies the connection log, so you can paste it into a bug report on GitHub." = "연결 로그를 복사합니다. GitHub 버그 리포트에 붙여 넣을 수 있습니다.";
+"Copy diagnostics" = "진단 복사";
+"Copied" = "복사됨";

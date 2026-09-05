@@ -7,6 +7,7 @@ struct AboutView: View {
     let onBack: () -> Void
 
     @State private var fitTestActive = false
+    @State private var diagnosticsCopied = false
 
     private var status: BudsStatus { bluetooth.status }
     private var tint: Color { bluetooth.connectedModel?.tint ?? .blue }
@@ -20,6 +21,7 @@ struct AboutView: View {
                 VStack(spacing: 18) {
                     infoSection
                     if supportsFitTest { fitTestSection }
+                    diagnosticsSection
                 }
                 .padding(18)
             }
@@ -81,6 +83,46 @@ struct AboutView: View {
                 .tint(fitTestActive ? .red : tint)
             }
             .padding(.vertical, 12)
+        }
+    }
+
+    /// Puts the connection log on the clipboard so it can be pasted straight
+    /// into a bug report — the app keeps no log files, and connection problems
+    /// are otherwise undiagnosable on hardware we can't reproduce.
+    private var diagnosticsSection: some View {
+        section("Diagnostics") {
+            VStack(spacing: 12) {
+                Text("Copies the connection log, so you can paste it into a bug report on GitHub.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button(action: copyDiagnostics) {
+                    Text(diagnosticsCopied ? "Copied" : "Copy diagnostics")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+            }
+            .padding(.vertical, 12)
+        }
+    }
+
+    private func copyDiagnostics() {
+        let summary = """
+            Device: \(bluetooth.connectedName ?? "—") \
+            (\(bluetooth.connectedModel?.rawValue ?? "—"))
+            Firmware: \(status.softwareVersion.isEmpty ? "—" : status.softwareVersion)
+            Connected: \(bluetooth.isConnected)
+            """
+        let report = DiagnosticsLog.shared.export(deviceSummary: summary)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(report, forType: .string)
+
+        diagnosticsCopied = true
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            diagnosticsCopied = false
         }
     }
 

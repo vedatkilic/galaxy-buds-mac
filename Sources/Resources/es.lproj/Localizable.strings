@@ -43,7 +43,6 @@
 "Find Buds" = "Buscar";
 "Stop Find" = "Detener";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "No se encontró el servicio de control de los Galaxy Buds. Prueba a eliminar y volver a emparejar los auriculares en Ajustes del sistema → Bluetooth.";
-"Connection timed out. The earbuds may not be exposing the control channel right now." = "Se agotó el tiempo de conexión. Puede que los auriculares no expongan el canal de control en este momento.";
 "Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Permiso de Bluetooth denegado. Permite BudsApp en Ajustes del sistema → Privacidad y seguridad → Bluetooth.";
 "Bluetooth is off. Please turn it on." = "El Bluetooth está apagado. Por favor, actívalo.";
 "Listen mode" = "Modo de escucha";
@@ -113,3 +112,8 @@
 "Custom" = "Personalizado";
 "Reset to flat" = "Restablecer a plano";
 "Preset curve (read-only)" = "Curva del preajuste (solo lectura)";
+
+"Diagnostics" = "Diagnóstico";
+"Copies the connection log, so you can paste it into a bug report on GitHub." = "Copia el registro de conexión para que puedas pegarlo en un informe de error en GitHub.";
+"Copy diagnostics" = "Copiar diagnóstico";
+"Copied" = "Copiado";

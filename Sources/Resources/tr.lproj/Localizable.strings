@@ -43,7 +43,6 @@
 "Find Buds" = "Kulaklığı Bul";
 "Stop Find" = "Aramayı Durdur";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "Galaxy Buds kontrol servisi bulunamadı. Kulaklığı System Settings → Bluetooth'tan kaldırıp yeniden eşleştirmeyi deneyin.";
-"Connection timed out. The earbuds may not be exposing the control channel right now." = "Bağlantı zaman aşımına uğradı. Kulaklık şu anda kontrol kanalını açmıyor olabilir.";
 "Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Bluetooth izni reddedildi. BudsApp'e System Settings → Privacy & Security → Bluetooth'tan izin verin.";
 "Bluetooth is off. Please turn it on." = "Bluetooth kapalı. Lütfen açın.";
 "Listen mode" = "Dinleme modu";
@@ -113,3 +112,8 @@
 "Custom" = "Özel";
 "Reset to flat" = "Düze sıfırla";
 "Preset curve (read-only)" = "Hazır ayar eğrisi (salt okunur)";
+
+"Diagnostics" = "Tanılama";
+"Copies the connection log, so you can paste it into a bug report on GitHub." = "Bağlantı günlüğünü kopyalar; GitHub'da hata bildirimine yapıştırabilirsiniz.";
+"Copy diagnostics" = "Tanılamayı kopyala";
+"Copied" = "Kopyalandı";

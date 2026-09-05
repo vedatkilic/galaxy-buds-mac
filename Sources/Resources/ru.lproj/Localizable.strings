@@ -43,7 +43,6 @@
 "Find Buds" = "Найти наушники";
 "Stop Find" = "Остановить поиск";
 "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth." = "Служба управления Galaxy Buds не найдена. Попробуйте удалить и заново подключить наушники в Системных настройках → Bluetooth.";
-"Connection timed out. The earbuds may not be exposing the control channel right now." = "Время ожидания подключения истекло. Возможно, наушники сейчас не открывают канал управления.";
 "Bluetooth permission denied. Allow BudsApp under System Settings → Privacy & Security → Bluetooth." = "Доступ к Bluetooth запрещён. Разрешите BudsApp в Системных настройках → Конфиденциальность и безопасность → Bluetooth.";
 "Bluetooth is off. Please turn it on." = "Bluetooth выключен. Включите его.";
 "Listen mode" = "Режим звука";
@@ -113,3 +112,8 @@
 "Custom" = "Свой";
 "Reset to flat" = "Сбросить до нуля";
 "Preset curve (read-only)" = "Кривая пресета (только чтение)";
+
+"Diagnostics" = "Диагностика";
+"Copies the connection log, so you can paste it into a bug report on GitHub." = "Копирует журнал подключения, чтобы вы могли вставить его в отчёт об ошибке на GitHub.";
+"Copy diagnostics" = "Копировать диагностику";
+"Copied" = "Скопировано";
