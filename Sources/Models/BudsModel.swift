@@ -93,6 +93,31 @@ enum BudsModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Whether the model supports Samsung Seamless Connection (a.k.a. Bluetooth
+    /// multipoint between two host devices). Per the upstream protocol spec this
+    /// is available on every model from Buds Live onward; the legacy 1st-gen
+    /// Buds and Buds+ predate the feature.
+    var supportsSeamlessConnection: Bool {
+        switch self {
+        case .buds, .budsPlus:
+            return false
+        default:
+            return true
+        }
+    }
+
+    /// Whether the model supports the per-band custom equalizer (9 signed gain
+    /// bands, -10..+10). Only the newest models expose the CUSTOM_EQUALIZE SPP
+    /// messages; older models offer presets only.
+    var supportsCustomEqualizer: Bool {
+        switch self {
+        case .buds3Pro, .buds3Fe, .buds4, .buds4Pro:
+            return true
+        default:
+            return false
+        }
+    }
+
     var maxAmbientVolume: Int {
         switch self {
         case .buds:

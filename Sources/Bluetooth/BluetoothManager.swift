@@ -36,6 +36,16 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// fails. Guards against overlapping attempts (auto-connect racing the
     /// wizard) that would otherwise reset the timeout and clobber `silentConnect`.
     private var isConnecting = false
+    /// Current auto-retry attempt (0 = first try). Connection failures trigger
+    /// up to `maxConnectRetries` automatic retries before surfacing an error.
+    private var connectRetryCount = 0
+    private let maxConnectRetries = 2
+    /// While true, the buds were intentionally handed off to the phone: the Mac
+    /// drops the full Bluetooth link (A2DP audio + SPP control) so the buds fall
+    /// back to the phone, and auto-reconnect is suppressed until the user
+    /// requests it back. macOS exposes no API to drop only A2DP, so this is the
+    /// only way to make the buds release the Mac's audio claim.
+    var handedOffToPhone = false
     private var connectedDevice: IOBluetoothDevice?
     private var inquiry: IOBluetoothDeviceInquiry?
     private var centralManager: CBCentralManager?
@@ -68,6 +78,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// for future connections.
     func startAutoConnect() {
         autoConnectArmed = true
+        loadCustomEqualizer()
         primeBluetoothPermission()
         if bluetoothReady { armConnectNotifications() }
     }
@@ -94,7 +105,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
     /// Connects to the first already-connected, paired Galaxy Buds, if any.
     private func attemptAutoConnect(notify: Bool) {
-        guard bluetoothReady, !isConnected, rfcommChannel == nil, !isConnecting else { return }
+        guard bluetoothReady, !isConnected, rfcommChannel == nil, !isConnecting,
+              !handedOffToPhone else { return }
         guard let paired = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] else { return }
         for device in paired where device.isConnected() && isGalaxyBudsName(device.name ?? "") {
             autoConnectShouldNotify = notify
@@ -168,27 +180,58 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         connectedModel = model
         connectedName = device.name
         connectedDevice = device.device
+        connectRetryCount = 0
         startConnectTimeout()
+        attemptConnection(device: device, model: model)
+    }
 
+    /// Runs one connection attempt: resolves the RFCOMM channel off the main
+    /// thread, then opens it on the main thread. On failure, retries up to
+    /// `maxConnectRetries` times before giving up.
+    private func attemptConnection(device: DiscoveredDevice, model: BudsModel) {
         let target = device.device
         let uuidString = model.serviceUUID
 
         // Resolve the RFCOMM channel off the main thread: this ensures the
         // baseband link is up and performs/polls the SDP query (which can take
-        // up to ~2s). The actual channel is then opened back on the main thread
+        // up to ~8s). The actual channel is then opened back on the main thread
         // so its data callbacks bind to the always-pumping main run loop.
         Task.detached(priority: .userInitiated) { [weak self] in
             guard let self else { return }
             let channelId = self.resolveChannel(target: target, uuidString: uuidString)
             await MainActor.run {
+                guard self.isConnecting else { return }
                 if let channelId {
                     self.connectViaRFCOMM(device: target, channelId: channelId)
                 } else {
-                    self.failConnect(String(
-                        localized: "Couldn't find the Galaxy Buds control service. Try removing and re-pairing the earbuds in System Settings → Bluetooth."))
+                    self.handleConnectFailure(device: device, model: model)
                 }
             }
         }
+    }
+
+    /// Handles a single connection attempt failure: retries automatically up to
+    /// `maxConnectRetries` times (with a short backoff between tries) before
+    /// surfacing the error to the user. Auto-connect (silent) attempts always
+    /// fail quietly regardless of retry count.
+    private func handleConnectFailure(device: DiscoveredDevice, model: BudsModel) {
+        guard isConnecting else { return }
+        connectRetryCount += 1
+
+        if connectRetryCount <= maxConnectRetries {
+            // Retry after a short backoff (1s, then 2s).
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                try? await Task.sleep(for: .seconds(self.connectRetryCount))
+                guard self.isConnecting else { return }
+                self.attemptConnection(device: device, model: model)
+            }
+            return
+        }
+
+        // All retries exhausted — surface the error (unless silent/auto-connect).
+        failConnect(String(
+            localized: "Couldn't connect after multiple tries. Make sure the earbuds aren't connected to another device, then try again."))
     }
 
     /// Ensures the baseband connection, runs an SDP query, and polls for the
@@ -207,13 +250,16 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         let uuidBytes = uuidStringToBytes(uuidString)
         let uuid = IOBluetoothSDPUUID(bytes: uuidBytes, length: uuidBytes.count)
 
-        // Try cached SDP first, then force a fresh query and poll for ~2.5s.
+        // Try cached SDP first, then force a fresh query and poll for ~8s.
+        // The original 2.5s window was too short — the buds often take 3-5s to
+        // expose their SPP service after the baseband link comes up, especially
+        // when recovering from a phone multipoint session.
         if let channel = rfcommChannel(on: target, uuid: uuid) {
             return channel
         }
         _ = target.performSDPQuery(nil)
-        for _ in 0..<25 {
-            Thread.sleep(forTimeInterval: 0.1)
+        for _ in 0..<40 {
+            Thread.sleep(forTimeInterval: 0.2)
             if let channel = rfcommChannel(on: target, uuid: uuid) {
                 return channel
             }
@@ -250,12 +296,37 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         }
     }
 
+    /// Hands the buds off to the phone: drops the full Bluetooth link (A2DP
+    /// audio + SPP control) so the buds fall back to the phone for audio, and
+    /// suppresses auto-reconnect until `reclaimFromPhone()` is called. This is
+    /// the only way to make the buds release the Mac's audio claim, since macOS
+    /// has no API to drop just the A2DP profile while keeping SPP.
+    func handOffToPhone() {
+        handedOffToPhone = true
+        rfcommChannel?.close()
+        rfcommChannel = nil
+        connectedDevice?.closeConnection()
+        isConnected = false
+        isConnecting = false
+        cancelConnectTimeout()
+    }
+
+    /// Reclaims the buds on the Mac: clears the hand-off and immediately
+    /// attempts to reconnect (control channel + audio).
+    func reclaimFromPhone() {
+        handedOffToPhone = false
+        suppressAutoConnect = false
+        lastAutoAttempt = nil
+        pollAutoConnect()
+    }
+
     /// Polled (~every 2s) by the app: connects to an already-connected paired
     /// Galaxy Buds. More reliable than IOBluetooth connect notifications, which
     /// don't fire dependably on all macOS versions.
     func pollAutoConnect() {
         guard autoConnectArmed, bluetoothReady, !isConnected,
-              rfcommChannel == nil, !isConnecting, !suppressAutoConnect else {
+              rfcommChannel == nil, !isConnecting, !suppressAutoConnect,
+              !handedOffToPhone else {
             return
         }
         // IOBluetooth `isConnected()` is unreliable for these buds (returns false
@@ -365,7 +436,21 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.ambientDuringCalls = enabled
     }
 
+    /// Toggles Samsung Seamless Connection (Bluetooth multipoint between two
+    /// host devices). The wire value is inverted: 0 = enabled, 1 = disabled.
+    func setSeamlessConnection(_ enabled: Bool) {
+        sendMessage(SppMessage(
+            messageId: .setSeamlessConnection, payload: Data([enabled ? 0 : 1])))
+        status.seamlessConnectionEnabled = enabled
+    }
+
     func setEqualizer(_ preset: EqualizerPreset) {
+        if preset == .custom {
+            // Custom preset: push the saved band table then select it. The
+            // EQUALIZER wire value for custom is 7 (custom index 6 + 1).
+            setCustomEqualizer(bands: status.customEqualizerBands)
+            return
+        }
         // Modern models (Buds3/4 Pro) expect a single byte: 0 = off, else
         // preset+1. Our EqualizerPreset raw values already match that wire scale
         // (off=0, bassBoost=1 … trebleBoost=5).
@@ -375,6 +460,44 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         )
         sendMessage(msg)
         status.equalizerPreset = preset
+        status.customEqualizerEnabled = false
+    }
+
+    /// Sets the custom 9-band equalizer. Each band is a signed gain in -10...+10.
+    /// Sends the band table (id 137) then selects the custom preset via the
+    /// EQUALIZER message (value 7 = custom index 6 + 1), matching the upstream
+    /// protocol verified against Buds4 Pro hardware. Persists the curve so it
+    /// survives disconnects/restarts.
+    func setCustomEqualizer(bands: [Int]) {
+        let clamped = (0..<9).map { i in
+            Int8(max(-10, min(10, bands.indices.contains(i) ? bands[i] : 0)))
+        }
+        var payload = Data([9]) // band count
+        for band in clamped {
+            payload.append(UInt8(bitPattern: band))
+        }
+        sendMessage(SppMessage(messageId: .customEqualize, payload: payload))
+        sendMessage(SppMessage(messageId: .equalizer, payload: Data([7])))
+        let intBands = clamped.map { Int($0) }
+        status.customEqualizerBands = intBands
+        status.customEqualizerEnabled = true
+        status.equalizerPreset = .custom
+        saveCustomEqualizer(intBands)
+    }
+
+    /// Updates a single custom EQ band in-place and re-pushes the table.
+    func setCustomEqualizerBand(_ index: Int, value: Int) {
+        var bands = status.customEqualizerBands
+        guard bands.indices.contains(index) else { return }
+        bands[index] = max(-10, min(10, value))
+        setCustomEqualizer(bands: bands)
+    }
+
+    /// Asks the device for its full EQ preset band-curve table (id 105). The
+    /// response is parsed in `parseCustomEqualizerData`. Used to visualise each
+    /// preset's shape on the equalizer graph.
+    func requestPresetCurves() {
+        sendMessage(SppMessage(messageId: .customEqualizeRecv))
     }
 
     func setTouchpadLock(_ locked: Bool) {
@@ -485,6 +608,17 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         isConnected = true
         stopScanning()
         sendInitialHandshake()
+        // Fetch the device's EQ preset curves so the graph can visualise each
+        // preset's shape. Best-effort: some firmware replies flat or not at all.
+        if connectedModel?.supportsCustomEqualizer == true {
+            requestPresetCurves()
+        }
+        // Force Seamless Connection on at connect: without multipoint enabled,
+        // a paired phone claims the single bud link and the app can no longer
+        // reach the buds. The user controls audio via hand-off instead.
+        if connectedModel?.supportsSeamlessConnection == true {
+            setSeamlessConnection(true)
+        }
         if autoConnectShouldNotify {
             autoConnectShouldNotify = false
             onAutoConnected?()
@@ -506,7 +640,9 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     private func startConnectTimeout() {
         connectTimeoutTask?.cancel()
         connectTimeoutTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(12))
+            // 30s allows for up to 2 retries (each try can take ~8s SDP + ~1-2s
+            // backoff) before the timeout fires.
+            try? await Task.sleep(for: .seconds(30))
             guard !Task.isCancelled, !self.isConnected else { return }
             self.failConnect(String(
                 localized: "Connection timed out. The earbuds may not be exposing the control channel right now."))
@@ -609,6 +745,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             parseSerialNumber(message.payload)
         case .checkFitResult:
             parseFitResult(message.payload)
+        case .customEqualizeRecv:
+            parseCustomEqualizerData(message.payload)
         default:
             break
         }
@@ -640,10 +778,80 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.fitRight = BudsStatus.FitResult(rawValue: Int(payload[1])) ?? .unknown
     }
 
+    /// Parses the CUSTOM_EQUALIZE_RECV payload:
+    ///   [presetCount][bandCount][(presetCount - 1) * bandCount preset table][bandCount custom gains]
+    /// The flat first preset is omitted on the wire. Each gain is a signed byte.
+    /// Populates `presetEqualizerCurves` (for the graph) and, if the custom
+    /// block is present and non-flat, `customEqualizerBands`.
+    private func parseCustomEqualizerData(_ payload: Data) {
+        guard payload.count >= 2 else { return }
+        let presetCount = Int(payload[0])
+        let bandCount = Int(payload[1])
+        guard bandCount > 0, presetCount >= 1 else { return }
+
+        // Reconstruct the full preset table. Preset 0 (Normal) is flat and not
+        // sent; presets 1…presetCount-1 follow at offset 2.
+        var curves: [[Int]] = [Array(repeating: 0, count: bandCount)] // Normal
+        let tableStart = 2
+        for p in 1..<presetCount {
+            let base = tableStart + (p - 1) * bandCount
+            guard base + bandCount <= payload.count else { break }
+            var bands: [Int] = []
+            for i in 0..<bandCount {
+                bands.append(Int(Int8(bitPattern: payload[base + i])))
+            }
+            curves.append(bands)
+        }
+        if !curves.isEmpty { status.presetEqualizerCurves = curves }
+
+        // Custom band gains follow the preset table.
+        let customStart = 2 + (presetCount - 1) * bandCount
+        guard customStart + bandCount <= payload.count else { return }
+        var custom: [Int] = []
+        for i in 0..<bandCount {
+            custom.append(Int(Int8(bitPattern: payload[customStart + i])))
+        }
+        // Only adopt the device's custom bands if they're non-flat AND the user
+        // has no saved curve of their own (first-connect seeding).
+        if !custom.allSatisfy({ $0 == 0 }), status.customEqualizerBands.allSatisfy({ $0 == 0 }) {
+            status.customEqualizerBands = custom
+        }
+    }
+
+    // MARK: - Custom EQ persistence
+
+    /// UserDefaults key for the persisted custom EQ band table.
+    private let customEQKey = "com.nivorbit.budsapp.customEqualizerBands"
+
+    /// Loads the saved custom EQ bands into `status`, if any. Called once on
+    /// startup so the user's last custom curve survives reconnects/restarts.
+    private func loadCustomEqualizer() {
+        if let saved = UserDefaults.standard.array(forKey: customEQKey) as? [Int],
+           saved.count == 9 {
+            status.customEqualizerBands = saved
+        }
+    }
+
+    private func saveCustomEqualizer(_ bands: [Int]) {
+        UserDefaults.standard.set(bands, forKey: customEQKey)
+    }
+
     private func parseStatusUpdate(_ payload: Data) {
-        guard payload.count >= 3 else { return }
-        status.batteryLeft = Int(payload[0])
-        status.batteryRight = Int(payload[1])
+        let isLegacy = connectedModel?.usesLegacyProtocol ?? false
+        if isLegacy {
+            // 1st-gen Buds: [earType, batteryL, batteryR, ...]
+            guard payload.count >= 3 else { return }
+            status.batteryLeft = Int(payload[1])
+            status.batteryRight = Int(payload[2])
+        } else {
+            // Modern models: [revision, batteryL, batteryR, isCoupled, mainConn,
+            // placement, batteryCase, ...] — note batteryL is at offset 1, NOT 0.
+            // Reading offset 0 as batteryLeft was surfacing the firmware revision
+            // (typically 1) as "1%" for the left bud.
+            guard payload.count >= 3 else { return }
+            status.batteryLeft = Int(payload[1])
+            status.batteryRight = Int(payload[2])
+        }
     }
 
     private func parseExtendedStatusUpdate(_ payload: Data) {
@@ -695,41 +903,42 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.isRightWearing = status.placementRight == .wearing
 
         status.batteryCase = Int(payload[7])
-        status.ambientSoundEnabled = payload[8] != 0
-        status.ambientVoiceFocus = payload[9] != 0
-
-        // payload[9] = EQ on SppNew models (0=off, 1..5 = preset+1), payload[12]
-        // = noise control mode (0=Off,1=ANC,2=Ambient,3=Adaptive), per
-        // GalaxyBudsClient's decoder.
-        status.equalizerPreset = EqualizerPreset(rawValue: Int(payload[9])) ?? .off
+        // payload[8] = AdjustSoundSync on modern models. payload[9] = EQ preset
+        // (0=off, 1..5 = preset+1, 7 = custom). payload[12] = noise control mode
+        // (0=Off,1=ANC,2=Ambient,3=Adaptive). Per GalaxyBudsClient's decoder.
+        let eqMode = Int(payload[9])
+        if eqMode == 7 {
+            status.equalizerPreset = .custom
+            status.customEqualizerEnabled = true
+        } else {
+            status.equalizerPreset = EqualizerPreset(rawValue: eqMode) ?? .off
+            status.customEqualizerEnabled = false
+        }
         status.noiseControlMode = NoiseControlMode(rawValue: Int(payload[12])) ?? .off
 
-        // payload[14] requires at least 15 bytes; older firmware sends fewer.
-        if payload.count > 14 {
-            status.deviceColor = BudsStatus.DeviceColor(rawValue: Int(payload[14] & 0x0F)) ?? .black
+        // Device color: the left earbud's colour sits as a little-endian Int16
+        // at payload[14..16]. We only need the low byte to resolve our enum, and
+        // older firmware may send fewer than 16 bytes.
+        if payload.count >= 16 {
+            let colorByte = payload[14]
+            status.deviceColor = BudsStatus.DeviceColor(rawValue: Int(colorByte)) ?? .black
+        }
+
+        // payload[19] = Seamless Connection (inverted: 0 = enabled). Available
+        // on every model from Buds Live onward; older firmware omits the field.
+        if payload.count > 19 {
+            status.seamlessConnectionEnabled = (payload[19] == 0)
         }
 
         parseSoundAndAncDetails(payload)
     }
 
     /// Reads the Sound & ANC detail fields from the Buds3/4 Pro extended-status
-    /// payload (offsets per GalaxyBudsClient's `>= Buds3 Pro` decoder path).
-    /// Each offset is guarded since older firmware sends shorter payloads.
+    /// payload. Offsets follow GalaxyBudsClient's `>= Buds3 Pro` decoder path
+    /// (which differ from the BudsPro/Buds2Pro paths). Each offset is guarded
+    /// since older firmware sends shorter payloads.
     private func parseSoundAndAncDetails(_ payload: Data) {
         func byte(_ i: Int) -> Int? { payload.count > i ? Int(payload[i]) : nil }
-
-        if let v = byte(23) { status.ambientSoundVolume = v }
-        if let v = byte(26) { status.detectConversations = v == 1 }
-        if let v = byte(27) { status.detectConversationsDuration = min(v, 2) }
-        if let v = byte(29) { status.ambientCustomEnabled = v == 1 }
-        if let v = byte(30) {
-            status.ambientCustomLeft = (v >> 4) & 0x0F
-            status.ambientCustomRight = v & 0x0F
-        }
-        if let v = byte(31) { status.ambientTone = v }
-        if let v = byte(32) { status.ncWithOneEarbud = v == 1 }
-        if let v = byte(33) { status.sidetone = v == 1 }
-        if let v = byte(34) { status.ambientDuringCalls = v == 0 } // inverted
 
         // payload[10] bit 7 (inverted) = touchpad lock; payload[11] nibbles =
         // per-side hold action; payload[21] bits = noise-control cycle subset.
@@ -742,6 +951,24 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             status.noiseCycleRight = cycle(amb: v & 1 != 0, off: v & 4 != 0, anc: v & 8 != 0)
             status.noiseCycleLeft = cycle(amb: v & 16 != 0, off: v & 64 != 0, anc: v & 128 != 0)
         }
+
+        // Buds3/4 Pro detail fields (revision-gated in the upstream decoder).
+        if let v = byte(23) { status.ambientSoundVolume = v }
+        // payload[24] = ANC strength (0 = Low, 1 = High).
+        if let v = byte(24) { status.ancLevelHigh = v == 1 }
+        if let v = byte(26) { status.detectConversations = v == 1 }
+        if let v = byte(27) { status.detectConversationsDuration = min(v, 2) }
+        // rev8+: one-earbud NC + ambient customisation.
+        if let v = byte(32) { status.ncWithOneEarbud = v == 1 }
+        if let v = byte(33) { status.ambientCustomEnabled = v == 1 }
+        if let v = byte(34) {
+            status.ambientCustomLeft = (v >> 4) & 0x0F
+            status.ambientCustomRight = v & 0x0F
+        }
+        if let v = byte(35) { status.ambientTone = v }
+        // rev9+: sidetone; rev10+: call path control (inverted).
+        if let v = byte(36) { status.sidetone = v == 1 }
+        if let v = byte(37) { status.ambientDuringCalls = v == 0 }
     }
 
     private func cycle(amb: Bool, off: Bool, anc: Bool) -> NoiseControlCycle {

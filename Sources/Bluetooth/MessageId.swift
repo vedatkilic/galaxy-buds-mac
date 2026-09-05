@@ -11,6 +11,10 @@ enum MessageId: UInt8, Sendable {
     case statusUpdated = 96
     case extendedStatusUpdated = 97
 
+    // Buds → host: reports the full EQ preset band-curve table plus the stored
+    // custom band gains (id 137 is the reverse direction). Requested on demand.
+    case customEqualizeRecv = 105
+
     case setAmbientMode = 128
     case ambientVolume = 132
     case equalizer = 134
@@ -40,4 +44,13 @@ enum MessageId: UInt8, Sendable {
     case noiseControlsUpdate = 119  // buds → host: ANC changed on the earbud
     case noiseControls = 120        // host → buds: set ANC/Ambient/Off/Adaptive
     case pairingMode = 114
+
+    // Multipoint / Seamless Connection. The wire value is inverted: 0 = enabled,
+    // 1 = disabled (matches the upstream protocol and the extended-status field).
+    case setSeamlessConnection = 175
+
+    // Custom 9-band equalizer (Buds4 Pro). Send payload [bandCount, band0..band8]
+    // with each band a signed byte (-10..+10); then select the custom preset via
+    // the EQUALIZER message with value 7 (custom index 6 + 1).
+    case customEqualize = 137
 }

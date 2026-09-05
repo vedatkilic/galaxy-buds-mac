@@ -31,6 +31,7 @@ swiftc -parse-as-library \
   Sources/Views/WizardView.swift \
   Sources/Views/DashboardView.swift \
   Sources/Views/SoundAncView.swift \
+  Sources/Views/EqualizerView.swift \
   Sources/Views/EarbudControlsView.swift \
   Sources/Views/FindMyEarbudsView.swift \
   Sources/Views/AboutView.swift \
