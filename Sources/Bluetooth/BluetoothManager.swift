@@ -84,6 +84,31 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     /// so the UI can surface the panel — an AirPods-like pop-up on connect.
     var onAutoConnected: (@MainActor () -> Void)?
 
+    /// Firmware transfers ride the same control channel, so the manager owns the
+    /// updater and forwards the device's FOTA messages to it.
+    let firmware = FirmwareUpdater()
+
+    override init() {
+        super.init()
+        firmware.send = { [weak self] message in self?.sendMessage(message) }
+        firmware.onFinished = { [weak self] _ in self?.handleFirmwareTransferEnded() }
+    }
+
+    /// The buds reboot into the new firmware on their own once the transfer
+    /// ends, so drop the stale link and let auto-connect pick them back up.
+    private func handleFirmwareTransferEnded() {
+        rfcommChannel?.close()
+        rfcommChannel = nil
+        connectedDevice?.closeConnection()
+        isConnected = false
+        isConnecting = false
+        suppressAutoConnect = false
+        lastAutoAttempt = nil
+    }
+
+    /// Largest single write the open channel accepts, 0 when disconnected.
+    var channelMtu: Int { Int(rfcommChannel?.getMTU() ?? 0) }
+
     /// Instantiates CoreBluetooth to trigger the system Bluetooth permission
     /// prompt and to gate IOBluetooth access. On modern macOS,
     /// `IOBluetoothDevice.pairedDevices()` routes through CoreBluetooth and
@@ -474,14 +499,23 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
         let legacy = connectedModel?.usesLegacyProtocol ?? false
         var encoded = message.encode(legacy: legacy)
-        let length = UInt16(encoded.count)
+        // RFCOMM rejects a single write larger than the channel MTU. Control
+        // messages are tiny, but firmware chunks run right up against it, so
+        // split on the boundary — the receiver reassembles from the frame's own
+        // length field either way.
+        let limit = max(1, Int(channel.getMTU()))
 
         encoded.withUnsafeMutableBytes { ptr in
             guard let baseAddress = ptr.baseAddress else { return }
-            channel.writeSync(
-                baseAddress.assumingMemoryBound(to: UInt8.self),
-                length: length
-            )
+            var offset = 0
+            while offset < ptr.count {
+                let size = min(limit, ptr.count - offset)
+                channel.writeSync(
+                    baseAddress.advanced(by: offset).assumingMemoryBound(to: UInt8.self),
+                    length: UInt16(size)
+                )
+                offset += size
+            }
         }
     }
 
@@ -732,9 +766,13 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // A silent attempt no longer clears the error up front, so clear it here
         // once one actually succeeds.
         connectionError = nil
-        DiagnosticsLog.shared.log("connected to \(connectedName ?? "?") as \(connectedModel?.rawValue ?? "?")")
+        DiagnosticsLog.shared.log(
+            "connected to \(connectedName ?? "?") as \(connectedModel?.rawValue ?? "?"), channel mtu \(channelMtu)")
         stopScanning()
         sendInitialHandshake()
+        // The software version gates the firmware update check, so read it as
+        // soon as the link is up rather than only when About is opened.
+        requestAboutInfo()
         // Fetch the device's EQ preset curves so the graph can visualise each
         // preset's shape. Best-effort: some firmware replies flat or not at all.
         if connectedModel?.supportsCustomEqualizer == true {
@@ -837,6 +875,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
     private func handleMessage(_ message: SppMessage) {
         switch message.messageId {
+        case .fotaOpen, .fotaControl, .fotaDownloadData, .fotaUpdate, .fotaResult:
+            firmware.handle(message)
         case .statusUpdated:
             parseStatusUpdate(message.payload)
         case .extendedStatusUpdated:
@@ -868,6 +908,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         let bytes = payload[(payload.startIndex + 2)..<(payload.startIndex + 22)]
         let filtered = bytes.filter { $0 != 0 }
         status.softwareVersion = String(decoding: filtered, as: UTF8.self)
+        DiagnosticsLog.shared.log("software version: \(status.softwareVersion)")
     }
 
     /// Left/right serial numbers: 11 ASCII bytes each.
@@ -1181,6 +1222,7 @@ extension BluetoothManager: IOBluetoothRFCOMMChannelDelegate {
         Task { @MainActor in
             self.isConnected = false
             self.rfcommChannel = nil
+            self.firmware.connectionLost()
         }
     }
 }

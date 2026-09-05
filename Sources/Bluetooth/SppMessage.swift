@@ -4,11 +4,20 @@ struct SppMessage: Sendable {
     let messageId: MessageId
     let payload: Data
     let isResponse: Bool
+    /// Marks a frame as one piece of a larger stream. Only the firmware
+    /// transfer uses it: the buds expect every FOTA data chunk flagged this way.
+    let isFragment: Bool
 
-    init(messageId: MessageId, payload: Data = Data(), isResponse: Bool = false) {
+    init(
+        messageId: MessageId,
+        payload: Data = Data(),
+        isResponse: Bool = false,
+        isFragment: Bool = false
+    ) {
         self.messageId = messageId
         self.payload = payload
         self.isResponse = isResponse
+        self.isFragment = isFragment
     }
 
     func encode(legacy: Bool) -> Data {
@@ -42,6 +51,9 @@ struct SppMessage: Sendable {
         let payloadSize = 1 + payload.count + 2 // msgId + payload + CRC
 
         var header: UInt16 = UInt16(payloadSize) & 0x3FF
+        if isFragment {
+            header |= 0x2000
+        }
         if isResponse {
             header |= 0x1000
         }

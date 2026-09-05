@@ -49,6 +49,15 @@ enum MessageId: UInt8, Sendable {
     // 1 = disabled (matches the upstream protocol and the extended-status field).
     case setSeamlessConnection = 175
 
+    // Firmware over-the-air update. The buds drive the transfer: the host opens
+    // a session with the segment table, then answers the device's MTU, segment
+    // and chunk requests until it reports the copy finished.
+    case fotaResult = 185         // buds → host: final verification result
+    case fotaOpen = 187           // host → buds: open session (segment table)
+    case fotaControl = 188        // both: MTU negotiation, per-segment ready
+    case fotaDownloadData = 189   // both: chunk request / chunk payload
+    case fotaUpdate = 190         // buds → host: copy percent, state change
+
     // Custom 9-band equalizer (Buds4 Pro). Send payload [bandCount, band0..band8]
     // with each band a signed byte (-10..+10); then select the custom preset via
     // the EQUALIZER message with value 7 (custom index 6 + 1).

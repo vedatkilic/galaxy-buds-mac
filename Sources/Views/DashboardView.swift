@@ -11,6 +11,7 @@ struct DashboardView: View {
     @State private var showEqualizer = false
     @State private var showFindMyEarbuds = false
     @State private var showAbout = false
+    @State private var showFirmware = false
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
     private var status: BudsStatus { bluetooth.status }
@@ -28,6 +29,8 @@ struct DashboardView: View {
             FindMyEarbudsView(bluetooth: bluetooth) { showFindMyEarbuds = false }
         } else if showAbout {
             AboutView(bluetooth: bluetooth) { showAbout = false }
+        } else if showFirmware {
+            FirmwareUpdateView(bluetooth: bluetooth) { showFirmware = false }
         } else {
             ScrollView {
                 VStack(spacing: 16) {
@@ -196,6 +199,8 @@ struct DashboardView: View {
             }
             group {
                 navRow(icon: "bell.badge", title: "Find earbuds") { showFindMyEarbuds = true }
+                Divider()
+                navRow(icon: "arrow.down.circle", title: "Firmware") { showFirmware = true }
                 Divider()
                 navRow(icon: "info.circle", title: "About") { showAbout = true }
             }

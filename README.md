@@ -28,7 +28,10 @@ gestures, find-my-earbuds, and more — without leaving your menu bar.
 - **Earbud controls** — touch-and-hold action per side, noise-control cycle,
   touchpad lock.
 - **Find My Earbuds** — ring both buds, mute one side while you search.
-- **About / Diagnostics** — software version, serial numbers, earbud fit test.
+- **Firmware** — checks the community archive of Samsung's official builds and
+  installs a newer one over Bluetooth.
+- **About / Diagnostics** — software version, serial numbers, earbud fit test,
+  and a copyable connection log for bug reports.
 - **Auto-connect** when the buds connect, and **Launch at login**.
 - **Localized** in 11 languages — follows your Mac's language.
 

@@ -22,6 +22,9 @@ swiftc -parse-as-library \
   Sources/Models/EqualizerPreset.swift \
   Sources/Models/TouchControls.swift \
   Sources/Diagnostics/DiagnosticsLog.swift \
+  Sources/Firmware/FirmwareBinary.swift \
+  Sources/Firmware/FirmwareCatalog.swift \
+  Sources/Firmware/FirmwareUpdater.swift \
   Sources/Bluetooth/CRC16.swift \
   Sources/Bluetooth/MessageId.swift \
   Sources/Bluetooth/SppMessage.swift \
@@ -36,6 +39,7 @@ swiftc -parse-as-library \
   Sources/Views/EarbudControlsView.swift \
   Sources/Views/FindMyEarbudsView.swift \
   Sources/Views/AboutView.swift \
+  Sources/Views/FirmwareUpdateView.swift \
   Sources/Views/PopoverView.swift \
   Sources/App/LaunchAtLogin.swift \
   Sources/App/StatusBarController.swift \
