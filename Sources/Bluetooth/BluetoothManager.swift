@@ -49,7 +49,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     private let attemptTimeout: TimeInterval = 35
     /// Ceiling on the whole connect, retries included: once passed, no further
     /// retry starts. Bounds the worst case at roughly one attempt beyond it.
-    private let connectBudget: TimeInterval = 60
+    private let connectBudget: TimeInterval = 45
     private var connectDeadline = Date.distantPast
     /// Bumped per `connect()` so a timed-out attempt's stale resolve task can't
     /// resurrect a connection the manager has already moved past.
@@ -256,7 +256,9 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             await MainActor.run {
                 guard self.isConnecting, self.connectGeneration == generation else { return }
                 if let channelId {
-                    self.connectViaRFCOMM(device: target, channelId: channelId)
+                    self.connectViaRFCOMM(
+                        device: device, model: model,
+                        channelId: channelId, generation: generation)
                 } else {
                     self.handleConnectFailure(device: device, model: model)
                 }
@@ -295,8 +297,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         guard isConnecting else { return }
         cancelAttemptTimeout()
         // Retire the attempt: a resolve task still running for it must not open
-        // a channel once the manager has moved on.
+        // a channel once the manager has moved on, and the half-open channel
+        // this attempt left behind has to be released before the next one
+        // replaces it.
         connectGeneration &+= 1
+        rfcommChannel?.close()
+        rfcommChannel = nil
         connectRetryCount += 1
 
         if connectRetryCount <= maxConnectRetries, Date() < connectDeadline {
@@ -727,31 +733,43 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
     // MARK: - Private
 
-    private func connectViaRFCOMM(device: IOBluetoothDevice, channelId: BluetoothRFCOMMChannelID) {
+    private func connectViaRFCOMM(
+        device: DiscoveredDevice,
+        model: BudsModel,
+        channelId: BluetoothRFCOMMChannelID,
+        generation: Int
+    ) {
         var channel: IOBluetoothRFCOMMChannel?
         // Async open on the main thread so the channel's data/open callbacks
         // bind to the main run loop. The init status is unreliable on macOS, so
         // success is confirmed via `rfcommChannelOpenComplete` or by polling
         // `isOpen` below.
-        _ = device.openRFCOMMChannelAsync(
+        _ = device.device.openRFCOMMChannelAsync(
             &channel,
             withChannelID: channelId,
             delegate: self
         )
         self.rfcommChannel = channel
-        self.connectedDevice = device
+        self.connectedDevice = device.device
 
         // Fallback: openRFCOMMChannelAsync can both lie about its status and, on
-        // some macOS builds, never fire the completion delegate. Poll isOpen.
-        Task { @MainActor in
+        // some macOS builds, never fire the completion delegate. Poll isOpen,
+        // then fail the attempt rather than letting it idle out: macOS keeps
+        // serving a stale SDP record for buds that are away, so the channel id
+        // resolves fine and only the open reveals that nothing is there.
+        Task { @MainActor [weak self] in
             for _ in 0..<100 {
                 try? await Task.sleep(for: .milliseconds(100))
+                guard let self, self.connectGeneration == generation else { return }
                 if self.isConnected { return }
                 if self.rfcommChannel?.isOpen() == true {
                     self.markConnected()
                     return
                 }
             }
+            guard let self, self.connectGeneration == generation, self.isConnecting else { return }
+            DiagnosticsLog.shared.log("rfcomm channel never opened")
+            self.handleConnectFailure(device: device, model: model)
         }
     }
 
