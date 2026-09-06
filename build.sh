@@ -31,6 +31,7 @@ swiftc -parse-as-library \
   Sources/Bluetooth/BluetoothManager.swift \
   Sources/Views/BudsModelUI.swift \
   Sources/Views/CircularBatteryGauge.swift \
+  Sources/Views/AncStrengthStepper.swift \
   Sources/Views/MenuPopoverView.swift \
   Sources/Views/WizardView.swift \
   Sources/Views/DashboardView.swift \

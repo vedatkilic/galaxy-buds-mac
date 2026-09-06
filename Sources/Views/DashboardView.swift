@@ -62,16 +62,7 @@ struct DashboardView: View {
                 }
             }
 
-            HStack(spacing: 30) {
-                CircularBatteryGauge(level: status.batteryLeft, label: "Left", diameter: 76)
-                CircularBatteryGauge(level: status.batteryRight, label: "Right", diameter: 76)
-            }
-
-            if bluetooth.connectedModel?.supportsCaseBattery == true, status.batteryCase > 0 {
-                Text("Case \(status.batteryCase)%")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            batteries
 
             if supportsAnc {
                 nodeSelector
@@ -85,6 +76,28 @@ struct DashboardView: View {
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 14).fill(Color(nsColor: .controlBackgroundColor)))
+    }
+
+    /// Same three dials as the menu-bar popover, sized for the wider window, so
+    /// the two surfaces report charge identically. The case reads "—" whenever
+    /// the buds are out of it and it has nothing to report.
+    private var batteries: some View {
+        let showCase = bluetooth.connectedModel?.supportsCaseBattery == true
+        return HStack(spacing: showCase ? 18 : 30) {
+            CircularBatteryGauge(
+                level: status.batteryLeft, label: "Left",
+                present: status.batteryLeft > 0, charging: status.isLeftCharging,
+                diameter: showCase ? 84 : 90)
+            CircularBatteryGauge(
+                level: status.batteryRight, label: "Right",
+                present: status.batteryRight > 0, charging: status.isRightCharging,
+                diameter: showCase ? 84 : 90)
+            if showCase {
+                CircularBatteryGauge(
+                    level: status.batteryCase, label: "Case",
+                    present: status.batteryCase > 0, diameter: 84)
+            }
+        }
     }
 
     private var nodeModes: [NoiseControlMode] {
@@ -137,14 +150,11 @@ struct DashboardView: View {
     private var ancStrengthRow: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("ANC strength").font(.system(size: 13))
-            HStack(spacing: 10) {
-                Text("Low").font(.caption).foregroundStyle(.secondary)
-                Slider(value: Binding(
-                    get: { status.ancLevelHigh ? 1.0 : 0.0 },
-                    set: { bluetooth.setAncLevelHigh($0 >= 0.5) }
-                ), in: 0...1, step: 1)
-                Text("High").font(.caption).foregroundStyle(.secondary)
-            }
+            AncStrengthStepper(
+                level: status.ancLevel,
+                count: bluetooth.connectedModel?.ancLevelCount ?? 2,
+                tint: tint
+            ) { bluetooth.setAncLevel($0) }
         }
     }
 

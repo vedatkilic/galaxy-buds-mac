@@ -6,9 +6,11 @@ final class BudsStatus: @unchecked Sendable {
     var batteryRight: Int = 0
     var batteryCase: Int = 0
 
+    /// Derived from placement — the payload carries no charging flag, and a
+    /// bud only charges inside the case. The case itself gives no signal about
+    /// whether *it* is plugged in, so there is deliberately no equivalent for it.
     var isLeftCharging: Bool = false
     var isRightCharging: Bool = false
-    var isCaseCharging: Bool = false
 
     var isLeftWearing: Bool = false
     var isRightWearing: Bool = false
@@ -26,7 +28,7 @@ final class BudsStatus: @unchecked Sendable {
     var noiseControlMode: NoiseControlMode = .off
 
     // Sound & ANC detail settings (Buds3/4 Pro).
-    var ancLevelHigh: Bool = false           // ANC strength Low/High
+    var ancLevel: Int = 0                    // ANC strength, 0-based step
     var ncWithOneEarbud: Bool = false        // allow noise control with one bud
     var ambientCustomEnabled: Bool = false   // customize ambient per side
     var ambientCustomLeft: Int = 1           // 0...2
@@ -81,6 +83,9 @@ final class BudsStatus: @unchecked Sendable {
         case notWearing = 2
         case inCase = 3
         case inClosedCase = 4
+
+        /// Open or closed, the bud is on the charging pins either way.
+        var isInCase: Bool { self == .inCase || self == .inClosedCase }
     }
 
     enum MainConnection: Int, Sendable {

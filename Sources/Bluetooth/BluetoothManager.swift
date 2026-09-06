@@ -552,10 +552,14 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.ambientSoundVolume = volume
     }
 
-    /// Sets ANC strength. Buds4 Pro exposes a Low/High toggle, not a free slider.
-    func setAncLevelHigh(_ high: Bool) {
-        sendMessage(SppMessage(messageId: .noiseReductionLevel, payload: Data([high ? 1 : 0])))
-        status.ancLevelHigh = high
+    /// Sets ANC strength. The value is a 0-based step; the device echoes it back
+    /// in the extended status, which is how the range was established against
+    /// Buds4 Pro hardware. Older models only distinguish 0 and 1.
+    func setAncLevel(_ level: Int) {
+        let count = connectedModel?.ancLevelCount ?? 2
+        let clamped = max(0, min(count - 1, level))
+        sendMessage(SppMessage(messageId: .noiseReductionLevel, payload: Data([UInt8(clamped)])))
+        status.ancLevel = clamped
     }
 
     func setNoiseControlWithOneEarbud(_ enabled: Bool) {
@@ -895,12 +899,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         switch message.messageId {
         case .fotaOpen, .fotaControl, .fotaDownloadData, .fotaUpdate, .fotaResult:
             firmware.handle(message)
-        case .statusUpdated:
-            parseStatusUpdate(message.payload)
         case .extendedStatusUpdated:
             parseExtendedStatusUpdate(message.payload)
             let ack = SppMessage(messageId: .resp, payload: Data([message.messageId.rawValue, 0]))
             sendMessage(ack)
+        case .statusUpdated:
+            parseStatusUpdate(message.payload)
         case .noiseControlsUpdate:
             // Pushed when the user changes ANC on the earbud itself.
             if !message.payload.isEmpty,
@@ -1045,7 +1049,26 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
             guard payload.count >= 3 else { return }
             status.batteryLeft = Int(payload[1])
             status.batteryRight = Int(payload[2])
+            // Placement and case charge ride along on this push too. Reading
+            // them only from the extended status froze both at their connect-time
+            // values, so the case sat at whatever it happened to hold when the
+            // app started and never moved again.
+            if payload.count > 5 { applyPlacement(payload[5]) }
+            if payload.count > 6 { status.batteryCase = Int(payload[6]) }
         }
+    }
+
+    /// Splits the placement byte — left in the high nibble, right in the low —
+    /// into the wearing and charging state each side reports. Shared by the
+    /// periodic status push and the extended status, which carry the same byte
+    /// at different offsets.
+    private func applyPlacement(_ byte: UInt8) {
+        status.placementLeft = BudsStatus.Placement(rawValue: Int(byte >> 4)) ?? .unknown
+        status.placementRight = BudsStatus.Placement(rawValue: Int(byte & 0x0F)) ?? .unknown
+        status.isLeftWearing = status.placementLeft == .wearing
+        status.isRightWearing = status.placementRight == .wearing
+        status.isLeftCharging = status.placementLeft.isInCase
+        status.isRightCharging = status.placementRight.isInCase
     }
 
     private func parseExtendedStatusUpdate(_ payload: Data) {
@@ -1090,11 +1113,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         status.isCoupled = payload[4] != 0
         status.mainConnection = BudsStatus.MainConnection(rawValue: Int(payload[5])) ?? .right
 
-        let placement = payload[6]
-        status.placementLeft = BudsStatus.Placement(rawValue: Int(placement >> 4)) ?? .unknown
-        status.placementRight = BudsStatus.Placement(rawValue: Int(placement & 0x0F)) ?? .unknown
-        status.isLeftWearing = status.placementLeft == .wearing
-        status.isRightWearing = status.placementRight == .wearing
+        applyPlacement(payload[6])
 
         status.batteryCase = Int(payload[7])
         // payload[8] = AdjustSoundSync on modern models. payload[9] = EQ preset
@@ -1149,7 +1168,8 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // Buds3/4 Pro detail fields (revision-gated in the upstream decoder).
         if let v = byte(23) { status.ambientSoundVolume = v }
         // payload[24] = ANC strength (0 = Low, 1 = High).
-        if let v = byte(24) { status.ancLevelHigh = v == 1 }
+        // payload[24] = ANC strength as a 0-based step.
+        if let v = byte(24) { status.ancLevel = v }
         if let v = byte(26) { status.detectConversations = v == 1 }
         if let v = byte(27) { status.detectConversationsDuration = min(v, 2) }
         // rev8+: one-earbud NC + ambient customisation.

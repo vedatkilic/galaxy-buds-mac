@@ -46,10 +46,7 @@ struct MenuPopoverView: View {
                 Spacer()
             }
 
-            HStack(spacing: 28) {
-                CircularBatteryGauge(level: bluetooth.status.batteryLeft, label: "Left", diameter: 76)
-                CircularBatteryGauge(level: bluetooth.status.batteryRight, label: "Right", diameter: 76)
-            }
+            batteries
 
             if bluetooth.connectedModel?.supportsANC == true {
                 listenMode
@@ -71,44 +68,86 @@ struct MenuPopoverView: View {
         }
     }
 
+    /// Per-earbud charge plus the case, each on its own dial. The case reports
+    /// only while the buds are sitting in it, so it shows "—" the rest of the
+    /// time rather than a misleading 0%.
+    private var batteries: some View {
+        let status = bluetooth.status
+        let showCase = bluetooth.connectedModel?.supportsCaseBattery == true
+        return HStack(spacing: showCase ? 12 : 28) {
+            CircularBatteryGauge(
+                level: status.batteryLeft, label: "Left",
+                present: status.batteryLeft > 0, charging: status.isLeftCharging,
+                diameter: showCase ? 66 : 76)
+            CircularBatteryGauge(
+                level: status.batteryRight, label: "Right",
+                present: status.batteryRight > 0, charging: status.isRightCharging,
+                diameter: showCase ? 66 : 76)
+            if showCase {
+                CircularBatteryGauge(
+                    level: status.batteryCase, label: "Case",
+                    present: status.batteryCase > 0, diameter: 66)
+            }
+        }
+    }
+
+    private static let modeCircle: CGFloat = 38
+
+    /// The listen-mode picker, drawn as circles strung along a rail the way the
+    /// Galaxy Wearable app does it, so the two read as the same control.
     private var listenMode: some View {
         let modes: [NoiseControlMode] =
             bluetooth.connectedModel?.supportsAdaptiveANC == true
             ? [.off, .ambient, .adaptive, .anc]
             : [.off, .ambient, .anc]
-        return HStack(spacing: 2) {
-            ForEach(modes) { mode in
-                let selected = bluetooth.status.noiseControlMode == mode
-                Button(action: { bluetooth.setNoiseControl(mode) }) {
-                    VStack(spacing: 3) {
-                        Image(systemName: mode.iconName).font(.system(size: 15))
-                        Text(LocalizedStringKey(mode.shortName)).font(.system(size: 9))
+        return GeometryReader { geo in
+            let cell = geo.size.width / CGFloat(modes.count)
+            ZStack(alignment: .top) {
+                Capsule()
+                    .fill(Color.secondary.opacity(0.22))
+                    .frame(width: max(0, geo.size.width - cell), height: 2)
+                    .position(x: geo.size.width / 2, y: Self.modeCircle / 2)
+                HStack(spacing: 0) {
+                    ForEach(modes) { mode in
+                        modeButton(mode).frame(width: cell)
                     }
-                    .foregroundStyle(selected ? tint : Color.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(selected ? Color(nsColor: .controlBackgroundColor) : .clear)
-                            .shadow(color: selected ? .black.opacity(0.12) : .clear, radius: 1, y: 0.5)
-                    )
                 }
-                .buttonStyle(.plain)
             }
         }
-        .padding(3)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.12)))
+        .frame(height: Self.modeCircle + 32)
+    }
+
+    private func modeButton(_ mode: NoiseControlMode) -> some View {
+        let selected = bluetooth.status.noiseControlMode == mode
+        return Button(action: { bluetooth.setNoiseControl(mode) }) {
+            VStack(spacing: 6) {
+                ZStack {
+                    Circle()
+                        .fill(selected ? tint : Color.secondary.opacity(0.14))
+                        .frame(width: Self.modeCircle, height: Self.modeCircle)
+                    Image(systemName: mode.iconName)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(selected ? Color.white : Color.secondary)
+                }
+                Text(LocalizedStringKey(mode.shortName))
+                    .font(.system(size: 10, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? tint : .secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var ancStrength: some View {
         HStack(spacing: 10) {
             Text("ANC strength").font(.system(size: 11)).foregroundStyle(.secondary)
-            Text("Low").font(.system(size: 10)).foregroundStyle(.secondary)
-            Slider(value: Binding(
-                get: { bluetooth.status.ancLevelHigh ? 1.0 : 0.0 },
-                set: { bluetooth.setAncLevelHigh($0 >= 0.5) }
-            ), in: 0...1, step: 1)
-            Text("High").font(.system(size: 10)).foregroundStyle(.secondary)
+            AncStrengthStepper(
+                level: bluetooth.status.ancLevel,
+                count: bluetooth.connectedModel?.ancLevelCount ?? 2,
+                tint: tint
+            ) { bluetooth.setAncLevel($0) }
         }
     }
 

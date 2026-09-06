@@ -54,16 +54,12 @@ struct SoundAncView: View {
     private var noiseSection: some View {
         section("Noise cancelling") {
             row("ANC strength") {
-                Picker("", selection: Binding(
-                    get: { status.ancLevelHigh ? 1 : 0 },
-                    set: { bluetooth.setAncLevelHigh($0 == 1) }
-                )) {
-                    Text("Low").tag(0)
-                    Text("High").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
+                AncStrengthStepper(
+                    level: status.ancLevel,
+                    count: bluetooth.connectedModel?.ancLevelCount ?? 2,
+                    tint: tint
+                ) { bluetooth.setAncLevel($0) }
+                .frame(width: 150)
             }
             Divider()
             toggleRow("Noise control with one earbud",

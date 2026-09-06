@@ -110,6 +110,17 @@ enum BudsModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Number of ANC strength steps the model exposes. Buds3/4 Pro answer the
+    /// same five steps the Galaxy Wearable app shows — verified against Buds4
+    /// Pro, which echoes every value back in its extended status. Everything
+    /// else is treated as the two-step Low/High the upstream protocol assumes.
+    var ancLevelCount: Int {
+        switch self {
+        case .buds3Pro, .buds4Pro: 5
+        default: 2
+        }
+    }
+
     /// Whether the model can auto-switch to ambient sound when you talk.
     var supportsDetectConversations: Bool {
         switch self {
