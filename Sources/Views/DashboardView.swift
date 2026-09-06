@@ -100,55 +100,20 @@ struct DashboardView: View {
         }
     }
 
-    private var nodeModes: [NoiseControlMode] {
-        bluetooth.connectedModel?.supportsAdaptiveANC == true
-            ? [.off, .ambient, .adaptive, .anc] : [.off, .ambient, .anc]
-    }
-
     private var nodeSelector: some View {
-        VStack(spacing: 6) {
-            ZStack {
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.25))
-                    .frame(height: 2)
-                    .padding(.horizontal, 28)
-                HStack(spacing: 0) {
-                    ForEach(nodeModes) { mode in
-                        node(mode).frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            HStack(spacing: 0) {
-                ForEach(nodeModes) { mode in
-                    Text(LocalizedStringKey(mode.shortName))
-                        .font(.system(size: 10,
-                                      weight: status.noiseControlMode == mode ? .semibold : .regular))
-                        .foregroundStyle(status.noiseControlMode == mode ? tint : Color.secondary)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-        }
+        ListenModePicker(
+            modes: bluetooth.connectedModel?.listenModes ?? [],
+            selection: status.noiseControlMode,
+            tint: tint
+        ) { bluetooth.setNoiseControl($0) }
         .padding(.top, 4)
     }
 
-    private func node(_ mode: NoiseControlMode) -> some View {
-        let selected = status.noiseControlMode == mode
-        return Button(action: { bluetooth.setNoiseControl(mode) }) {
-            ZStack {
-                Circle()
-                    .fill(selected ? tint : Color(nsColor: .controlBackgroundColor))
-                    .frame(width: 32, height: 32)
-                    .overlay(Circle().stroke(Color.secondary.opacity(selected ? 0 : 0.3), lineWidth: 0.5))
-                Image(systemName: mode.iconName)
-                    .font(.system(size: 15))
-                    .foregroundStyle(selected ? .white : .secondary)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
+    /// Dimmed unless ANC is the active mode, matching the menu-bar panel and the
+    /// Sound & ANC page — strength has no effect in ambient, off or adaptive.
     private var ancStrengthRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let active = status.noiseControlMode == .anc
+        return VStack(alignment: .leading, spacing: 8) {
             Text("ANC strength").font(.system(size: 13))
             AncStrengthStepper(
                 level: status.ancLevel,
@@ -156,6 +121,8 @@ struct DashboardView: View {
                 tint: tint
             ) { bluetooth.setAncLevel($0) }
         }
+        .disabled(!active)
+        .opacity(active ? 1 : 0.4)
     }
 
     private var autoSwitchRow: some View {

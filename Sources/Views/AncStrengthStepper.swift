@@ -17,6 +17,19 @@ struct AncStrengthStepper: View {
             track
             stepButton("plus", enabled: clamped < count - 1) { onChange(clamped + 1) }
         }
+        // One adjustable element rather than a row of unlabelled circles, which
+        // VoiceOver otherwise reads as a handful of anonymous buttons. Reusing
+        // the existing "ANC strength" key keeps this out of the 11 catalogues.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("ANC strength"))
+        .accessibilityValue(Text(verbatim: "\(clamped + 1)/\(count)"))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: if clamped < count - 1 { onChange(clamped + 1) }
+            case .decrement: if clamped > 0 { onChange(clamped - 1) }
+            @unknown default: break
+            }
+        }
     }
 
     private var track: some View {

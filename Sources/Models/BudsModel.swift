@@ -110,6 +110,12 @@ enum BudsModel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// The listen modes to offer. Adaptive is a Buds3/4 Pro feature; the rest
+    /// get the three-way Off / Ambient / ANC.
+    var listenModes: [NoiseControlMode] {
+        supportsAdaptiveANC ? [.off, .ambient, .adaptive, .anc] : [.off, .ambient, .anc]
+    }
+
     /// Number of ANC strength steps the model exposes. Buds3/4 Pro answer the
     /// same five steps the Galaxy Wearable app shows — verified against Buds4
     /// Pro, which echoes every value back in its extended status. Everything

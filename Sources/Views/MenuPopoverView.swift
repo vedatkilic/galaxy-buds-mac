@@ -50,9 +50,7 @@ struct MenuPopoverView: View {
 
             if bluetooth.connectedModel?.supportsANC == true {
                 listenMode
-                if bluetooth.status.noiseControlMode == .anc {
-                    ancStrength
-                }
+                ancStrength
             }
 
             equalizerRow
@@ -91,57 +89,20 @@ struct MenuPopoverView: View {
         }
     }
 
-    private static let modeCircle: CGFloat = 38
-
-    /// The listen-mode picker, drawn as circles strung along a rail the way the
-    /// Galaxy Wearable app does it, so the two read as the same control.
     private var listenMode: some View {
-        let modes: [NoiseControlMode] =
-            bluetooth.connectedModel?.supportsAdaptiveANC == true
-            ? [.off, .ambient, .adaptive, .anc]
-            : [.off, .ambient, .anc]
-        return GeometryReader { geo in
-            let cell = geo.size.width / CGFloat(modes.count)
-            ZStack(alignment: .top) {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.22))
-                    .frame(width: max(0, geo.size.width - cell), height: 2)
-                    .position(x: geo.size.width / 2, y: Self.modeCircle / 2)
-                HStack(spacing: 0) {
-                    ForEach(modes) { mode in
-                        modeButton(mode).frame(width: cell)
-                    }
-                }
-            }
-        }
-        .frame(height: Self.modeCircle + 32)
+        ListenModePicker(
+            modes: bluetooth.connectedModel?.listenModes ?? [],
+            selection: bluetooth.status.noiseControlMode,
+            tint: tint
+        ) { bluetooth.setNoiseControl($0) }
     }
 
-    private func modeButton(_ mode: NoiseControlMode) -> some View {
-        let selected = bluetooth.status.noiseControlMode == mode
-        return Button(action: { bluetooth.setNoiseControl(mode) }) {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle()
-                        .fill(selected ? tint : Color.secondary.opacity(0.14))
-                        .frame(width: Self.modeCircle, height: Self.modeCircle)
-                    Image(systemName: mode.iconName)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(selected ? Color.white : Color.secondary)
-                }
-                Text(LocalizedStringKey(mode.shortName))
-                    .font(.system(size: 10, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? tint : .secondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
+    /// Strength only means anything while ANC is the active mode — adaptive
+    /// picks its own. Dimmed rather than hidden so switching modes doesn't
+    /// resize the panel under the pointer.
     private var ancStrength: some View {
-        HStack(spacing: 10) {
+        let active = bluetooth.status.noiseControlMode == .anc
+        return HStack(spacing: 10) {
             Text("ANC strength").font(.system(size: 11)).foregroundStyle(.secondary)
             AncStrengthStepper(
                 level: bluetooth.status.ancLevel,
@@ -149,6 +110,8 @@ struct MenuPopoverView: View {
                 tint: tint
             ) { bluetooth.setAncLevel($0) }
         }
+        .disabled(!active)
+        .opacity(active ? 1 : 0.4)
     }
 
     private var equalizerRow: some View {

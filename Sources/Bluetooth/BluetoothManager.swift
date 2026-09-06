@@ -558,6 +558,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     func setAncLevel(_ level: Int) {
         let count = connectedModel?.ancLevelCount ?? 2
         let clamped = max(0, min(count - 1, level))
+        DiagnosticsLog.shared.log("ANC strength: sending step \(clamped) of \(count)")
         sendMessage(SppMessage(messageId: .noiseReductionLevel, payload: Data([UInt8(clamped)])))
         status.ancLevel = clamped
     }
@@ -1167,9 +1168,15 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
 
         // Buds3/4 Pro detail fields (revision-gated in the upstream decoder).
         if let v = byte(23) { status.ambientSoundVolume = v }
-        // payload[24] = ANC strength (0 = Low, 1 = High).
-        // payload[24] = ANC strength as a 0-based step.
-        if let v = byte(24) { status.ancLevel = v }
+        // payload[24] = ANC strength as a 0-based step. Logged on change so the
+        // write/read round-trip shows up in a diagnostics export — this byte is
+        // the only confirmation the device accepted a strength at all.
+        if let v = byte(24) {
+            if v != status.ancLevel {
+                DiagnosticsLog.shared.log("ANC strength: device reports step \(v)")
+            }
+            status.ancLevel = v
+        }
         if let v = byte(26) { status.detectConversations = v == 1 }
         if let v = byte(27) { status.detectConversationsDuration = min(v, 2) }
         // rev8+: one-earbud NC + ambient customisation.
