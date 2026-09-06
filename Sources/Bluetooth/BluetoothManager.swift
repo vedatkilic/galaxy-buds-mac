@@ -1172,9 +1172,7 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         // write/read round-trip shows up in a diagnostics export — this byte is
         // the only confirmation the device accepted a strength at all.
         if let v = byte(24) {
-            if v != status.ancLevel {
-                DiagnosticsLog.shared.log("ANC strength: device reports step \(v)")
-            }
+            DiagnosticsLog.shared.log("ANC strength: device reports step \(v)")
             status.ancLevel = v
         }
         if let v = byte(26) { status.detectConversations = v == 1 }
