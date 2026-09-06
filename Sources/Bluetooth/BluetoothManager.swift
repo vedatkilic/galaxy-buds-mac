@@ -995,7 +995,12 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
     // MARK: - Custom EQ persistence
 
     /// UserDefaults key for the persisted custom EQ band table.
-    private let customEQKey = "com.nivorbit.budsapp.customEqualizerBands"
+    private let customEQKey = "com.nivorbit.galaxybuds.customEqualizerBands"
+    /// Where the curve lived before the bundle identifier changed. Preferences
+    /// are keyed by bundle id, so an upgrade lands in an empty domain and the
+    /// user's curve would silently reset without this.
+    private let legacyDomain = "com.nivorbit.budsapp"
+    private let legacyCustomEQKey = "com.nivorbit.budsapp.customEqualizerBands"
 
     /// Loads the saved custom EQ bands into `status`, if any. Called once on
     /// startup so the user's last custom curve survives reconnects/restarts.
@@ -1003,7 +1008,22 @@ final class BluetoothManager: NSObject, @unchecked Sendable {
         if let saved = UserDefaults.standard.array(forKey: customEQKey) as? [Int],
            saved.count == 9 {
             status.customEqualizerBands = saved
+            return
         }
+        migrateCustomEqualizer()
+    }
+
+    /// One-shot carry-over of the curve saved under the previous bundle
+    /// identifier. Copies rather than moves: the old domain is left intact so a
+    /// downgrade still finds it.
+    private func migrateCustomEqualizer() {
+        guard let legacy = UserDefaults(suiteName: legacyDomain),
+              let saved = legacy.array(forKey: legacyCustomEQKey) as? [Int],
+              saved.count == 9
+        else { return }
+        status.customEqualizerBands = saved
+        UserDefaults.standard.set(saved, forKey: customEQKey)
+        DiagnosticsLog.shared.log("migrated custom EQ curve from \(legacyDomain)")
     }
 
     private func saveCustomEqualizer(_ bands: [Int]) {

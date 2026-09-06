@@ -67,7 +67,7 @@ done
 # app crashes on first Bluetooth access ("missing usage description").
 echo "Signing (ad-hoc)..."
 codesign --force --sign - \
-  --identifier com.nivorbit.budsapp \
+  --identifier com.nivorbit.galaxybuds \
   "$APP_BUNDLE"
 codesign --verify --verbose "$APP_BUNDLE" 2>&1 | tail -1
 

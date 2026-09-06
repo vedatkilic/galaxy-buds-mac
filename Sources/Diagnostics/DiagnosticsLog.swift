@@ -23,9 +23,9 @@ final class DiagnosticsLog: @unchecked Sendable {
     private let started = Date()
 
     /// Mirrored to the unified log so the trail survives a crash and can be read
-    /// with `log show --predicate 'subsystem == "com.nivorbit.budsapp"'` when a
+    /// with `log show --predicate 'subsystem == "com.nivorbit.galaxybuds"'` when a
     /// reporter can't reach the About page.
-    private let logger = Logger(subsystem: "com.nivorbit.budsapp", category: "connection")
+    private let logger = Logger(subsystem: "com.nivorbit.galaxybuds", category: "connection")
 
     private let formatter: DateFormatter = {
         let formatter = DateFormatter()

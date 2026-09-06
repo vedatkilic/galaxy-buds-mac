@@ -12,8 +12,8 @@
 #   brew install --cask vedatkilic/tap/galaxy-buds
 
 cask "galaxy-buds" do
-  version "1.2.1"
-  sha256 "53834b903fc7c4667bd747405f15a74e1b241510708ebe560ccb00f18c02e009"
+  version "1.3.0"
+  sha256 "a4451fa7adb4b91a90177d1908124e3ffc3ec59dcbaf192140cd3432553a8fc6"
 
   url "https://github.com/vedatkilic/galaxy-buds-mac/releases/download/v#{version}/Galaxy-Buds-#{version}.dmg"
   name "Galaxy Buds"
@@ -23,6 +23,7 @@ cask "galaxy-buds" do
   app "Galaxy Buds.app"
 
   zap trash: [
+    "~/Library/Preferences/com.nivorbit.galaxybuds.plist",
     "~/Library/Preferences/com.nivorbit.budsapp.plist",
   ]
 end
